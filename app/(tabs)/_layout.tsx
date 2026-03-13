@@ -21,7 +21,6 @@ export default function TabsLayout() {
         tabBarActiveTintColor: '#6c63ff',
         tabBarInactiveTintColor: '#6b7280',
         tabBarLabelStyle: { fontSize: 11 },
-        tabBarShowIcon: false,
       }}
     >
       <Tabs.Screen name="map" options={{ title: 'Map' }} />
