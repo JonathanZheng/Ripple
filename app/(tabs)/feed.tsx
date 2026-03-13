@@ -7,7 +7,8 @@ import {
   RefreshControl,
   TextInput,
 } from 'react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/useSession';
@@ -15,14 +16,6 @@ import { useProfile } from '@/hooks/useProfile';
 import { QuestCard } from '@/components/QuestCard';
 import { QUEST_TAGS } from '@/constants';
 import type { Quest, QuestTag, FulfilmentMode } from '@/types/database';
-
-const TAG_EMOJI: Record<string, string> = {
-  food: '🍜',
-  transport: '🚌',
-  social: '🎉',
-  skills: '💡',
-  errands: '📦',
-};
 
 export default function Feed() {
   const insets = useSafeAreaInsets();
@@ -50,10 +43,15 @@ export default function Feed() {
     if (!error && data) setQuests(data as Quest[]);
   }
 
-  useEffect(() => {
-    fetchQuests().finally(() => setLoading(false));
+  // Refetch whenever this screen comes into focus (catches newly posted quests)
+  useFocusEffect(
+    useCallback(() => {
+      fetchQuests().finally(() => setLoading(false));
+    }, []),
+  );
 
-    // Real-time: push new open quests to the top without refresh
+  // Real-time subscription: mount once, push new open quests to top
+  useEffect(() => {
     channelRef.current = supabase
       .channel('quests-feed')
       .on(
@@ -81,7 +79,6 @@ export default function Feed() {
 
   const now = new Date();
   const filtered = quests.filter((q) => {
-    // Drop expired quests so QuestCard never renders a null item
     if (new Date(q.deadline) <= now) return false;
     if (q.is_flash && q.flash_expires_at && new Date(q.flash_expires_at) <= now) return false;
     if (tagFilter !== 'all' && q.tag !== tagFilter) return false;
@@ -108,7 +105,7 @@ export default function Feed() {
       <View className="px-5 mb-3">
         <TextInput
           className="bg-surface text-white rounded-xl px-4 py-3"
-          placeholder="Search quests…"
+          placeholder="Search quests..."
           placeholderTextColor="#6b7280"
           value={search}
           onChangeText={setSearch}
@@ -131,7 +128,7 @@ export default function Feed() {
               onPress={() => setTagFilter(item as typeof tagFilter)}
             >
               <Text className={`text-sm ${tagFilter === item ? 'text-white' : 'text-muted'}`}>
-                {item === 'all' ? '✦ All' : `${TAG_EMOJI[item]} ${item}`}
+                {item === 'all' ? 'All' : item}
               </Text>
             </Pressable>
           )}
@@ -149,7 +146,7 @@ export default function Feed() {
             onPress={() => setModeFilter(m)}
           >
             <Text className={`text-xs ${modeFilter === m ? 'text-white' : 'text-muted'}`}>
-              {m === 'all' ? 'Any mode' : m === 'meetup' ? '🤝 Meet Up' : '📬 Drop Off'}
+              {m === 'all' ? 'Any mode' : m === 'meetup' ? 'Meet Up' : 'Drop Off'}
             </Text>
           </Pressable>
         ))}
@@ -178,7 +175,6 @@ export default function Feed() {
           }
           ListEmptyComponent={
             <View className="items-center justify-center py-20">
-              <Text className="text-4xl mb-3">🌊</Text>
               <Text className="text-white font-semibold text-base">No quests yet</Text>
               <Text className="text-muted text-sm mt-1 text-center">
                 {search || tagFilter !== 'all' || modeFilter !== 'all'

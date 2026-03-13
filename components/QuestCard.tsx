@@ -9,14 +9,6 @@ interface Props {
   userTier: TrustTier;
 }
 
-const TAG_EMOJI: Record<string, string> = {
-  food: '🍜',
-  transport: '🚌',
-  social: '🎉',
-  skills: '💡',
-  errands: '📦',
-};
-
 function canAccept(quest: Quest, tier: TrustTier): { ok: boolean; reason?: string } {
   if (quest.tag === 'food' && tier === 'wanderer')
     return { ok: false, reason: 'Explorer+ required for food quests' };
@@ -51,7 +43,7 @@ export function QuestCard({ quest, userTier }: Props) {
       {/* Flash badge */}
       {quest.is_flash && (
         <View className="bg-warning/20 border border-warning rounded-full px-2 py-0.5 self-start mb-2">
-          <Text className="text-warning text-xs font-semibold">⚡ Flash Quest</Text>
+          <Text className="text-warning text-xs font-semibold">Flash Quest</Text>
         </View>
       )}
 
@@ -62,19 +54,19 @@ export function QuestCard({ quest, userTier }: Props) {
           style={{ backgroundColor: tagColour + '33' }}
         >
           <Text style={{ color: tagColour }} className="text-xs font-semibold">
-            {TAG_EMOJI[quest.tag]} {quest.tag}
+            {quest.tag}
           </Text>
         </View>
 
         <View className="bg-surface-2 rounded-full px-2 py-0.5">
           <Text className="text-muted text-xs">
-            {quest.fulfilment_mode === 'meetup' ? '🤝 Meet Up' : '📬 Drop Off'}
+            {quest.fulfilment_mode === 'meetup' ? 'Meet Up' : 'Drop Off'}
           </Text>
         </View>
 
         {quest.location_name && (
           <Text className="text-muted text-xs flex-1" numberOfLines={1}>
-            📍 {quest.location_name}
+            {quest.location_name}
           </Text>
         )}
       </View>
@@ -101,7 +93,7 @@ export function QuestCard({ quest, userTier }: Props) {
       {!eligibility.ok && (
         <View className="mt-2 bg-surface-2 rounded-lg px-3 py-1.5">
           <Text className="text-muted text-xs">
-            🔒 {eligibility.reason} — you are {tierConfig.label}
+            {eligibility.reason} — you are {tierConfig.label}
           </Text>
         </View>
       )}

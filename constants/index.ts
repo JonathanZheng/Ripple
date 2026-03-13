@@ -15,13 +15,11 @@ export const TRUST_TIER_CONFIG = {
   wanderer: {
     label: 'Wanderer',
     colour: '#94a3b8',
-    emoji: '🧭',
     maxReward: 5,
   },
   explorer: {
     label: 'Explorer',
     colour: '#60a5fa',
-    emoji: '⚡',
     maxReward: Infinity,
     minQuests: 5,
     minRating: 4.0,
@@ -29,7 +27,6 @@ export const TRUST_TIER_CONFIG = {
   champion: {
     label: 'Champion',
     colour: '#fbbf24',
-    emoji: '🏆',
     maxReward: Infinity,
     minQuests: 20,
     minRating: 4.5,

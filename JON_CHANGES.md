@@ -175,6 +175,48 @@ Supabase email confirmation must be **disabled** in Dashboard → Authentication
 
 ---
 
+## Post-Stage 4 Fixes & Improvements
+
+**Goal:** Fix bugs discovered during testing, remove AI story step, remove all emojis, add Settings screen.
+
+### Files modified
+| File | Change |
+|------|--------|
+| `app/(tabs)/feed.tsx` | Added `useFocusEffect` to re-fetch on focus; removed all emojis |
+| `app/(tabs)/post-quest.tsx` | Fixed deadline selection bug; removed AI Review step; removed emojis |
+| `app/(tabs)/_layout.tsx` | Added Settings tab; removed emoji tab icons (`tabBarShowIcon: false`) |
+| `components/QuestCard.tsx` | Removed all emojis from badges, mode labels, location, tag chips |
+| `constants/index.ts` | Removed `emoji` fields from `TRUST_TIER_CONFIG` entries |
+| `app/_layout.tsx` | Removed non-existent `StyleSheet.setFlag('darkMode', 'class')` call from `react-native-css-interop` (caused runtime crash — `setFlag` doesn't exist in v0.2.2; `darkMode: 'class'` in `tailwind.config.js` is the correct mechanism) |
+
+### Files created
+| File | Purpose |
+|------|---------|
+| `app/(tabs)/settings.tsx` | Settings screen — shows email + trust tier, Sign Out button |
+
+### Bug: Posted quests not visible in feed
+**Root cause:** Feed fetched quests once on mount (`useEffect`). If the feed tab was already mounted before a quest was posted, navigating back to it did not re-fetch. Real-time subscription only catches INSERTs while the subscription is active — unreliable if the tab hadn't been opened yet.
+
+**Fix:** Replaced the mount-only fetch with `useFocusEffect` so `fetchQuests()` runs every time the feed tab comes into focus. Real-time subscription kept in a separate `useEffect` for live updates within a session.
+
+### Bug: "1 hour" and "3 hours" deadline options visually unselectable
+**Root cause:** `DEADLINE_OPTIONS` was defined inside the render function. For relative options, `isoVal` was computed as `new Date(Date.now() + hours * 3600_000).toISOString()` — a fresh timestamp on every render. After tapping "1 hour": `setDeadline(isoVal_t0)` was called, React re-rendered, `isoVal_t1` was computed (slightly later), and `deadline === isoVal_t1` evaluated to `false` immediately — so the button never appeared selected. "Tonight" and "Tomorrow noon" worked because their Date objects were stable across re-renders.
+
+**Fix:** Changed `deadline` state from storing an ISO string to storing the option label (`'1 hour'`, `'3 hours'`, `'Tonight (10 PM)'`, `'Tomorrow noon'`). Comparison is `deadlineLabel === opt.label` (always stable). ISO string is computed from the label only at submit time via `buildDeadlineFromLabel()`.
+
+### Removed: AI story / Review step
+The `process-quest` Edge Function invocation was awaited, making form submission slow. The Review step (showing GPT-4o generated adventure title + suggested reward) was removed. The edge function is now fired as fire-and-forget (no `await`) so tagging and embedding still happen in the background. User navigates straight to the feed after posting.
+
+### Removed: All emojis
+Stripped emoji characters from all UI files. Tag categories, fulfilment mode labels, flash/lock badges, location prefixes, tab icons, trust tier config, and empty states are all now plain text.
+
+### Added: Settings screen (`app/(tabs)/settings.tsx`)
+Basic settings page accessible as the 5th tab:
+- Displays signed-in email and current trust tier (coloured by tier)
+- Sign Out button calls `supabase.auth.signOut()` and redirects to `/(auth)`
+
+---
+
 ## Bug Fixes (across all stages)
 
 | Bug | File(s) | Fix |

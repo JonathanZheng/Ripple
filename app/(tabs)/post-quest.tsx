@@ -12,23 +12,31 @@ import { useState } from 'react';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { encodeGeohash } from '@/lib/geohash';
-import { QUEST_TAGS, TRUST_TIER_CONFIG } from '@/constants';
+import { QUEST_TAGS } from '@/constants';
 import type { QuestTag, FulfilmentMode } from '@/types/database';
 
 // NUS UTown rough centre
 const UTOWN_LAT = 1.3063;
 const UTOWN_LNG = 103.7733;
 
-const TAG_EMOJI: Record<QuestTag, string> = {
-  food: '🍜',
-  transport: '🚌',
-  social: '🎉',
-  skills: '💡',
-  errands: '📦',
-};
-
-const STEPS = ['Details', 'Location', 'Reward', 'Review'] as const;
+const STEPS = ['Details', 'Location', 'Reward'] as const;
 type Step = (typeof STEPS)[number];
+
+const DEADLINE_LABELS = ['1 hour', '3 hours', 'Tonight (10 PM)', 'Tomorrow noon'] as const;
+type DeadlineLabel = (typeof DEADLINE_LABELS)[number];
+
+function buildDeadlineFromLabel(label: DeadlineLabel): Date {
+  switch (label) {
+    case '1 hour':
+      return new Date(Date.now() + 1 * 3600 * 1000);
+    case '3 hours':
+      return new Date(Date.now() + 3 * 3600 * 1000);
+    case 'Tonight (10 PM)':
+      return todayAt(22);
+    case 'Tomorrow noon':
+      return tomorrowAt(12);
+  }
+}
 
 export default function PostQuest() {
   // Form state
@@ -37,7 +45,7 @@ export default function PostQuest() {
   const [tag, setTag] = useState<QuestTag | ''>('');
   const [mode, setMode] = useState<FulfilmentMode>('meetup');
   const [reward, setReward] = useState('');
-  const [deadline, setDeadline] = useState('');      // ISO string or relative label
+  const [deadlineLabel, setDeadlineLabel] = useState<DeadlineLabel | ''>('');
   const [locationName, setLocationName] = useState('UTown, NUS');
   const [isFlash, setIsFlash] = useState(false);
 
@@ -45,12 +53,6 @@ export default function PostQuest() {
   const [step, setStep] = useState<Step>('Details');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [aiResult, setAiResult] = useState<{
-    tag: QuestTag;
-    ai_title: string;
-    suggested_price_min: number;
-    suggested_price_max: number;
-  } | null>(null);
 
   const stepIndex = STEPS.indexOf(step);
 
@@ -64,16 +66,10 @@ export default function PostQuest() {
   function validateReward() {
     const r = parseFloat(reward);
     if (reward && (isNaN(r) || r < 0)) return 'Reward must be a positive number.';
-    const deadlineDate = buildDeadline();
-    if (!deadlineDate) return 'Please select a deadline.';
+    if (!deadlineLabel) return 'Please select a deadline.';
+    const deadlineDate = buildDeadlineFromLabel(deadlineLabel);
     if (deadlineDate <= new Date()) return 'Deadline must be in the future.';
     return null;
-  }
-
-  function buildDeadline(): Date | null {
-    if (!deadline) return null;
-    const d = new Date(deadline);
-    return isNaN(d.getTime()) ? null : d;
   }
 
   function next() {
@@ -103,12 +99,11 @@ export default function PostQuest() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setError('Not signed in.'); return; }
 
-      const deadlineDate = buildDeadline()!;
+      const deadlineDate = buildDeadlineFromLabel(deadlineLabel as DeadlineLabel);
       const flashExpiresAt = isFlash
         ? new Date(Date.now() + 30 * 60 * 1000).toISOString()
         : null;
 
-      // Insert quest row with the user-supplied tag (AI may override it)
       const { data: quest, error: insertError } = await supabase
         .from('quests')
         .insert({
@@ -135,19 +130,9 @@ export default function PostQuest() {
         return;
       }
 
-      // Invoke AI Edge Function (fire-and-forget with a brief wait for demo)
-      const { data: aiData } = await supabase.functions.invoke('process-quest', {
-        body: { quest_id: quest.id },
-      });
+      // Fire-and-forget AI processing (tagging + embedding)
+      supabase.functions.invoke('process-quest', { body: { quest_id: quest.id } });
 
-      if (aiData) {
-        setAiResult(aiData as typeof aiResult);
-        setStep('Review');
-        // Don't navigate yet — show the AI result to the user first
-        return;
-      }
-
-      // If AI call failed, just navigate away (quest is still created)
       router.replace('/(tabs)/feed');
     } catch (e: any) {
       setError(e?.message ?? 'Something went wrong.');
@@ -156,40 +141,10 @@ export default function PostQuest() {
     }
   }
 
-  // ─── Review step after AI processes ───────────────────────────────────────
-  if (step === 'Review' && aiResult) {
-    return (
-      <View className="flex-1 bg-background px-8 justify-center">
-        <Text className="text-2xl font-bold text-white mb-2">Quest created! ✨</Text>
-        <Text className="text-muted mb-6">Here's what the AI came up with:</Text>
-
-        <View className="bg-surface rounded-2xl p-5 mb-6">
-          <Text className="text-accent text-xs font-semibold mb-1 uppercase tracking-widest">
-            {TAG_EMOJI[aiResult.tag]} {aiResult.tag}
-          </Text>
-          <Text className="text-white text-lg font-bold mb-4">"{aiResult.ai_title}"</Text>
-
-          {(aiResult.suggested_price_min > 0 || aiResult.suggested_price_max > 0) && (
-            <Text className="text-muted text-sm">
-              Suggested reward: ${aiResult.suggested_price_min}–${aiResult.suggested_price_max}
-            </Text>
-          )}
-        </View>
-
-        <Pressable
-          className="bg-accent rounded-2xl py-4 items-center"
-          onPress={() => router.replace('/(tabs)/feed')}
-        >
-          <Text className="text-white font-semibold text-base">View in Feed</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
   // ─── Step indicator ────────────────────────────────────────────────────────
   const StepBar = () => (
     <View className="flex-row mb-8 gap-2">
-      {STEPS.slice(0, 3).map((s, i) => (
+      {STEPS.map((s, i) => (
         <View
           key={s}
           className={`flex-1 h-1 rounded-full ${i <= stepIndex ? 'bg-accent' : 'bg-surface-2'}`}
@@ -235,17 +190,16 @@ export default function PostQuest() {
             style={{ minHeight: 100 }}
           />
 
-          <Text className="text-muted text-sm mb-2">Category (optional — AI will auto-tag)</Text>
+          <Text className="text-muted text-sm mb-2">Category (optional)</Text>
           <View className="flex-row flex-wrap gap-2 mb-6">
             {QUEST_TAGS.map((t) => (
               <Pressable
                 key={t}
-                className={`px-3 py-2 rounded-full border flex-row items-center gap-1 ${
+                className={`px-3 py-2 rounded-full border ${
                   tag === t ? 'bg-accent border-accent' : 'border-surface-2'
                 }`}
                 onPress={() => setTag(tag === t ? '' : t)}
               >
-                <Text>{TAG_EMOJI[t]}</Text>
                 <Text className={tag === t ? 'text-white text-sm' : 'text-muted text-sm'}>{t}</Text>
               </Pressable>
             ))}
@@ -261,7 +215,6 @@ export default function PostQuest() {
                 }`}
                 onPress={() => setMode(m)}
               >
-                <Text className="text-lg">{m === 'meetup' ? '🤝' : '📬'}</Text>
                 <Text className={`text-sm mt-1 ${mode === m ? 'text-white' : 'text-muted'}`}>
                   {m === 'meetup' ? 'Meet Up' : 'Drop Off'}
                 </Text>
@@ -270,7 +223,7 @@ export default function PostQuest() {
           </View>
 
           <Pressable className="bg-accent rounded-2xl py-4 items-center" onPress={next}>
-            <Text className="text-white font-semibold text-base">Next →</Text>
+            <Text className="text-white font-semibold text-base">Next</Text>
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -319,10 +272,10 @@ export default function PostQuest() {
 
         <View className="flex-row gap-3">
           <Pressable className="flex-1 border border-surface-2 rounded-2xl py-4 items-center" onPress={back}>
-            <Text className="text-muted font-semibold">← Back</Text>
+            <Text className="text-muted font-semibold">Back</Text>
           </Pressable>
           <Pressable className="flex-1 bg-accent rounded-2xl py-4 items-center" onPress={next}>
-            <Text className="text-white font-semibold">Next →</Text>
+            <Text className="text-white font-semibold">Next</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -331,13 +284,6 @@ export default function PostQuest() {
 
   // ─── Step: Reward & Deadline ───────────────────────────────────────────────
   if (step === 'Reward') {
-    const DEADLINE_OPTIONS = [
-      { label: '1 hour', hours: 1 },
-      { label: '3 hours', hours: 3 },
-      { label: 'Tonight (10 PM)', hours: null, fixed: todayAt(22) },
-      { label: 'Tomorrow noon', hours: null, fixed: tomorrowAt(12) },
-    ];
-
     return (
       <KeyboardAvoidingView
         className="flex-1 bg-background"
@@ -365,24 +311,19 @@ export default function PostQuest() {
 
           <Text className="text-muted text-sm mb-2">Deadline</Text>
           <View className="flex-row flex-wrap gap-2 mb-4">
-            {DEADLINE_OPTIONS.map((opt) => {
-              const isoVal = opt.fixed
-                ? opt.fixed.toISOString()
-                : new Date(Date.now() + (opt.hours ?? 0) * 3600 * 1000).toISOString();
-              return (
-                <Pressable
-                  key={opt.label}
-                  className={`px-4 py-2 rounded-full border ${
-                    deadline === isoVal ? 'bg-accent border-accent' : 'border-surface-2'
-                  }`}
-                  onPress={() => setDeadline(isoVal)}
-                >
-                  <Text className={deadline === isoVal ? 'text-white text-sm' : 'text-muted text-sm'}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+            {DEADLINE_LABELS.map((label) => (
+              <Pressable
+                key={label}
+                className={`px-4 py-2 rounded-full border ${
+                  deadlineLabel === label ? 'bg-accent border-accent' : 'border-surface-2'
+                }`}
+                onPress={() => setDeadlineLabel(label)}
+              >
+                <Text className={deadlineLabel === label ? 'text-white text-sm' : 'text-muted text-sm'}>
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
           </View>
 
           <View className="flex-row items-center mb-8">
@@ -395,14 +336,14 @@ export default function PostQuest() {
               {isFlash && <Text className="text-white text-xs font-bold">✓</Text>}
             </Pressable>
             <View>
-              <Text className="text-white text-sm font-semibold">⚡ Flash Quest</Text>
+              <Text className="text-white text-sm font-semibold">Flash Quest</Text>
               <Text className="text-muted text-xs">Urgent — expires in 30 minutes</Text>
             </View>
           </View>
 
           <View className="flex-row gap-3">
             <Pressable className="flex-1 border border-surface-2 rounded-2xl py-4 items-center" onPress={back}>
-              <Text className="text-muted font-semibold">← Back</Text>
+              <Text className="text-muted font-semibold">Back</Text>
             </Pressable>
             <Pressable
               className="flex-1 bg-accent rounded-2xl py-4 items-center"
@@ -412,16 +353,10 @@ export default function PostQuest() {
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text className="text-white font-semibold">Post Quest ✦</Text>
+                <Text className="text-white font-semibold">Post Quest</Text>
               )}
             </Pressable>
           </View>
-
-          {loading && (
-            <Text className="text-muted text-xs text-center mt-4">
-              AI is generating your quest title and tag…
-            </Text>
-          )}
         </ScrollView>
       </KeyboardAvoidingView>
     );
