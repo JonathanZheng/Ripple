@@ -85,7 +85,7 @@ export default function ProfileScreen() {
   if (loading && !profile) {
     return (
       <View className="flex-1 bg-background items-center justify-center">
-        <ActivityIndicator color="#60a5fa" />
+        <ActivityIndicator color="#7c3aed" size="large" />
       </View>
     );
   }
@@ -93,7 +93,7 @@ export default function ProfileScreen() {
   if (!profile) {
     return (
       <View className="flex-1 bg-background items-center justify-center px-8">
-        <Text className="text-white">No profile found.</Text>
+        <Text className="text-white text-base font-semibold">No profile found.</Text>
       </View>
     );
   }
@@ -115,91 +115,93 @@ export default function ProfileScreen() {
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 32 }}>
 
-        {/* Header */}
-        <View className="px-4 pt-6 pb-4 gap-4">
-          <View className="flex-row items-center gap-4">
-            <View
-              className="w-16 h-16 rounded-full items-center justify-center"
-              style={{ backgroundColor: tierConfig.colour + '33' }}
-            >
-              <Text style={{ color: tierConfig.colour }} className="text-xl font-bold">{initials}</Text>
-            </View>
+        {/* Header with profile info */}
+        <View className="px-5 pt-6 pb-6 gap-4">
+          <View className="flex-row items-start justify-between">
+            <View className="flex-row items-center gap-4 flex-1">
+              <View
+                className="w-16 h-16 rounded-2xl items-center justify-center shadow-md"
+                style={{ backgroundColor: tierConfig.colour + '20' }}
+              >
+                <Text style={{ color: tierConfig.colour }} className="text-2xl font-bold">{initials}</Text>
+              </View>
 
-            <View className="flex-1">
-              <Text className="text-white text-xl font-bold">{profile.display_name}</Text>
-              <Text className="text-muted text-sm">{profile.rc}</Text>
-              <View className="flex-row items-center gap-2 mt-1">
-                <View
-                  className="self-start rounded-full px-3 py-0.5"
-                  style={{ backgroundColor: tierConfig.colour + '22' }}
-                >
-                  <Text className="text-xs font-semibold" style={{ color: tierConfig.colour }}>
-                    {tierConfig.label}
-                  </Text>
-                </View>
-                {(profile.streak_count ?? 0) > 0 && (
-                  <View className="bg-orange-500/20 rounded-full px-2 py-0.5">
-                    <Text className="text-orange-400 text-xs font-semibold">
-                      🔥 {profile.streak_count}d streak
+              <View className="flex-1">
+                <Text className="text-white text-xl font-bold">{profile.display_name}</Text>
+                <Text className="text-muted text-sm mt-0.5">{profile.rc}</Text>
+                <View className="flex-row items-center gap-2 mt-2">
+                  <View
+                    className="rounded-full px-3 py-1"
+                    style={{ backgroundColor: tierConfig.colour + '15' }}
+                  >
+                    <Text className="text-xs font-bold" style={{ color: tierConfig.colour }}>
+                      {tierConfig.label}
                     </Text>
                   </View>
-                )}
+                  {(profile.streak_count ?? 0) > 0 && (
+                    <View className="bg-warning/15 rounded-full px-2 py-1">
+                      <Text className="text-warning text-xs font-bold">
+                        🔥 {profile.streak_count}d
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
 
-            <Pressable onPress={handleSignOut} className="p-2">
-              <Text className="text-muted text-xs">Sign out</Text>
+            <Pressable onPress={handleSignOut} className="p-2 -mr-2">
+              <Text className="text-muted text-xs font-semibold">Sign out</Text>
             </Pressable>
           </View>
 
-          {/* Stats row — all sourced from the freshly fetched profile */}
-          <View className="bg-surface rounded-2xl p-4 flex-row justify-around">
-            <View className="items-center">
-              <Text className="text-white font-bold text-lg">{postedQuests.length}</Text>
-              <Text className="text-muted text-xs mt-0.5">Posted</Text>
+          {/* Stats row */}
+          <View className="bg-surface-2 rounded-2xl p-4 border border-surface-3 flex-row justify-around">
+            <View className="items-center flex-1">
+              <Text className="text-white font-bold text-xl">{postedQuests.length}</Text>
+              <Text className="text-muted text-xs mt-1 font-semibold">Posted</Text>
             </View>
-            <View className="w-px bg-surface-2" />
-            <View className="items-center">
-              <Text className="text-white font-bold text-lg">{profile.quests_completed ?? 0}</Text>
-              <Text className="text-muted text-xs mt-0.5">Completed</Text>
+            <View className="w-px bg-surface-3" />
+            <View className="items-center flex-1">
+              <Text className="text-white font-bold text-xl">{profile.quests_completed ?? 0}</Text>
+              <Text className="text-muted text-xs mt-1 font-semibold">Completed</Text>
             </View>
-            <View className="w-px bg-surface-2" />
-            <View className="items-center">
-              <Text className="text-yellow-400 font-bold text-lg">{(profile.avg_rating ?? 0).toFixed(1)}</Text>
-              <Text className="text-muted text-xs mt-0.5">Avg Rating</Text>
+            <View className="w-px bg-surface-3" />
+            <View className="items-center flex-1">
+              <Text className="text-warning font-bold text-xl">{(profile.avg_rating ?? 0).toFixed(1)}</Text>
+              <Text className="text-muted text-xs mt-1 font-semibold">Rating</Text>
             </View>
           </View>
         </View>
 
         {/* Strikes warning */}
         {(profile.strikes ?? 0) > 0 && (
-          <View className="mx-4 mb-4 bg-red-500/10 border border-red-500/30 rounded-2xl px-4 py-3 flex-row items-center gap-2">
-            <Text className="text-red-400 text-lg">⚠</Text>
-            <View>
-              <Text className="text-red-400 font-semibold text-sm">
+          <View className="mx-5 mb-4 bg-danger/10 border border-danger/30 rounded-2xl px-4 py-3 flex-row items-center gap-3">
+            <Text className="text-danger text-lg">⚠️</Text>
+            <View className="flex-1">
+              <Text className="text-danger font-bold text-sm">
                 {profile.strikes} Strike{profile.strikes > 1 ? 's' : ''}
               </Text>
-              <Text className="text-red-400/70 text-xs">
+              <Text className="text-danger/70 text-xs mt-0.5">
                 {profile.strikes >= 3
                   ? 'Account under review'
-                  : `${3 - profile.strikes} more until account review`}
+                  : `${3 - profile.strikes} more until review`}
               </Text>
             </View>
           </View>
         )}
 
-        {/* Skills */}
-        <View className="mx-4 mb-4 gap-3">
-          <Text className="text-white font-semibold">Skills</Text>
+        {/* Skills section */}
+        <View className="mx-5 mb-6 gap-3">
+          <Text className="text-white font-bold text-base">Skills & Interests</Text>
           <View className="flex-row flex-wrap gap-2">
             {localSkills.map((skill, i) => (
               <Pressable
                 key={i}
                 onPress={() => handleRemoveSkill(i)}
-                className="bg-accent/20 border border-accent/40 rounded-full px-3 py-1 flex-row items-center gap-1"
+                className="bg-accent/15 border border-accent/40 rounded-full px-3 py-1.5 flex-row items-center gap-1.5"
               >
-                <Text className="text-accent text-sm">{skill}</Text>
-                <Text className="text-accent/60 text-xs">×</Text>
+                <Text className="text-accent text-sm font-semibold">{skill}</Text>
+                <Text className="text-accent/60 text-xs font-bold">×</Text>
               </Pressable>
             ))}
           </View>
@@ -208,8 +210,8 @@ export default function ProfileScreen() {
               value={skillInput}
               onChangeText={setSkillInput}
               placeholder="Add a skill..."
-              placeholderTextColor="#64748b"
-              className="flex-1 bg-surface rounded-2xl px-4 py-2.5 text-white text-sm"
+              placeholderTextColor="#6b7280"
+              className="flex-1 bg-surface-2 rounded-lg px-4 py-3 text-white text-sm border border-surface-3"
               returnKeyType="done"
               onSubmitEditing={handleAddSkill}
             />
@@ -217,9 +219,9 @@ export default function ProfileScreen() {
               onPress={handleAddSkill}
               disabled={!skillInput.trim()}
               style={{ opacity: skillInput.trim() ? 1 : 0.4 }}
-              className="bg-accent rounded-2xl px-4 py-2.5 items-center justify-center"
+              className="bg-accent rounded-lg px-4 py-3 items-center justify-center"
             >
-              <Text className="text-white font-semibold text-sm">Add</Text>
+              <Text className="text-white font-bold text-sm">Add</Text>
             </Pressable>
           </View>
           {localSkills.length > 0 && (
@@ -228,18 +230,18 @@ export default function ProfileScreen() {
         </View>
 
         {/* Quest history */}
-        <View className="mx-4 gap-3">
-          <Text className="text-white font-semibold">Quest History</Text>
+        <View className="mx-5 gap-4">
+          <Text className="text-white font-bold text-base">Quest History</Text>
 
-          <View className="flex-row bg-surface rounded-2xl p-1 gap-1">
+          <View className="flex-row bg-surface-2 rounded-lg p-1 gap-1 border border-surface-3">
             {([['posted', 'Posted'], ['inprogress', 'In Progress'], ['completed', 'Completed']] as [Tab, string][]).map(
               ([tab, label]) => (
                 <Pressable
                   key={tab}
                   onPress={() => setActiveTab(tab)}
-                  className={`flex-1 rounded-xl py-2 items-center ${activeTab === tab ? 'bg-accent' : ''}`}
+                  className={`flex-1 rounded-md py-2.5 items-center transition-all ${activeTab === tab ? 'bg-accent shadow-accent-sm' : ''}`}
                 >
-                  <Text className={`text-xs font-semibold ${activeTab === tab ? 'text-white' : 'text-muted'}`}>
+                  <Text className={`text-xs font-bold ${activeTab === tab ? 'text-white' : 'text-muted'}`}>
                     {label}
                   </Text>
                 </Pressable>
@@ -248,7 +250,7 @@ export default function ProfileScreen() {
           </View>
 
           {loading ? (
-            <ActivityIndicator color="#60a5fa" style={{ marginTop: 24 }} />
+            <ActivityIndicator color="#7c3aed" style={{ marginTop: 24 }} />
           ) : tabQuests.length === 0 ? (
             <View className="py-12 items-center">
               <Text className="text-muted text-sm">No quests here yet.</Text>
@@ -258,12 +260,12 @@ export default function ProfileScreen() {
               <Pressable
                 key={quest.id}
                 onPress={() => router.push(`/quest/${quest.id}`)}
-                className="bg-surface rounded-2xl p-4 border border-surface-2"
+                className="bg-surface-2 rounded-xl p-4 border border-surface-3 shadow-sm active:shadow-md active:opacity-95"
               >
-                <Text className="text-white font-semibold" numberOfLines={1}>
+                <Text className="text-white font-bold text-base" numberOfLines={1}>
                   {quest.ai_generated_title ?? quest.title}
                 </Text>
-                <View className="flex-row items-center justify-between mt-2">
+                <View className="flex-row items-center justify-between mt-3">
                   <Text className="text-accent font-bold text-sm">
                     {quest.reward_amount > 0 ? `$${quest.reward_amount.toFixed(2)}` : 'Favour'}
                   </Text>

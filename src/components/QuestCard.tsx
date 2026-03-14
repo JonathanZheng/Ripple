@@ -54,35 +54,35 @@ export function QuestCard({ quest, userTier }: Props) {
   return (
     <Pressable
       onPress={() => router.push(`/quest/${quest.id}`)}
-      className="bg-surface rounded-2xl p-4 mb-3 border border-surface-2"
-      style={{ opacity: eligibility.ok ? 1 : 0.5 }}
+      className="bg-surface-2 rounded-2xl p-4 mb-3 border border-surface-3 shadow-md active:shadow-lg active:opacity-95"
+      style={{ opacity: eligibility.ok ? 1 : 0.6 }}
     >
       {/* Flash badge with live countdown */}
       {quest.is_flash && (
-        <View className="flex-row items-center gap-2 mb-2">
-          <View className="bg-warning/20 border border-warning rounded-full px-2 py-0.5">
-            <Text className="text-warning text-xs font-semibold">⚡ Flash Quest</Text>
+        <View className="flex-row items-center gap-2 mb-3">
+          <View className="bg-warning/20 border border-warning rounded-full px-2.5 py-1">
+            <Text className="text-warning text-xs font-bold">⚡ Flash Quest</Text>
           </View>
-          <View className="bg-surface-2 rounded-full px-2 py-0.5">
-            <Text className="text-warning text-xs font-mono">{flashCountdown}</Text>
+          <View className="bg-surface-3 rounded-full px-2.5 py-1 border border-surface-3">
+            <Text className="text-warning text-xs font-mono font-semibold">{flashCountdown}</Text>
           </View>
         </View>
       )}
 
       {/* Tag + fulfilment row */}
-      <View className="flex-row items-center gap-2 mb-2">
+      <View className="flex-row items-center gap-2 mb-3 flex-wrap">
         <View
-          className="rounded-full px-2 py-0.5"
-          style={{ backgroundColor: tagColour + '33' }}
+          className="rounded-full px-2.5 py-1"
+          style={{ backgroundColor: tagColour + '22' }}
         >
-          <Text style={{ color: tagColour }} className="text-xs font-semibold">
-            {quest.tag}
+          <Text style={{ color: tagColour }} className="text-xs font-bold">
+            {quest.tag.charAt(0).toUpperCase() + quest.tag.slice(1)}
           </Text>
         </View>
 
-        <View className="bg-surface-2 rounded-full px-2 py-0.5">
-          <Text className="text-muted text-xs">
-            {quest.fulfilment_mode === 'meetup' ? 'Meet Up' : 'Drop Off'}
+        <View className="bg-surface-3 rounded-full px-2.5 py-1 border border-surface-3">
+          <Text className="text-muted text-xs font-medium">
+            {quest.fulfilment_mode === 'meetup' ? '📍 Meet Up' : '📦 Drop Off'}
           </Text>
         </View>
 
@@ -94,27 +94,33 @@ export function QuestCard({ quest, userTier }: Props) {
       </View>
 
       {/* Title */}
-      <Text className="text-white font-semibold text-base mb-1 leading-snug" numberOfLines={2}>
+      <Text className="text-white font-bold text-base mb-2 leading-snug" numberOfLines={2}>
         {displayTitle}
       </Text>
 
       {/* Description preview */}
-      <Text className="text-muted text-sm mb-3" numberOfLines={2}>
+      <Text className="text-muted-light text-sm mb-4" numberOfLines={2}>
         {quest.description}
       </Text>
 
       {/* Bottom row: reward + deadline */}
       <View className="flex-row items-center justify-between">
-        <Text className="text-accent font-bold text-base">
-          {quest.reward_amount > 0 ? `$${quest.reward_amount.toFixed(2)}` : 'Favour'}
-        </Text>
-        <Text className="text-muted text-xs">{timeLeft}</Text>
+        <View>
+          <Text className="text-accent-light text-xs font-semibold mb-0.5">Reward</Text>
+          <Text className="text-accent font-bold text-lg">
+            {quest.reward_amount > 0 ? `$${quest.reward_amount.toFixed(2)}` : 'Favour'}
+          </Text>
+        </View>
+        <View className="items-end">
+          <Text className="text-muted text-xs mb-0.5">Deadline</Text>
+          <Text className="text-muted-light text-xs font-semibold">{timeLeft}</Text>
+        </View>
       </View>
 
       {/* Ineligibility notice */}
       {!eligibility.ok && (
-        <View className="mt-2 bg-surface-2 rounded-lg px-3 py-1.5">
-          <Text className="text-muted text-xs">
+        <View className="mt-3 bg-danger/10 rounded-lg px-3 py-2 border border-danger/20">
+          <Text className="text-danger text-xs font-semibold">
             {eligibility.reason} — you are {tierConfig.label}
           </Text>
         </View>

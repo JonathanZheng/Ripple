@@ -96,15 +96,15 @@ export default function Feed() {
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       {/* Header */}
-      <View className="px-5 pt-4 pb-2">
-        <Text className="text-2xl font-bold text-white">Quests</Text>
-        <Text className="text-muted text-sm">Active requests near you</Text>
+      <View className="px-5 pt-4 pb-6">
+        <Text className="text-3xl font-bold text-white mb-1">Quests</Text>
+        <Text className="text-muted text-sm">Discover requests near you</Text>
       </View>
 
       {/* Search */}
-      <View className="px-5 mb-3">
+      <View className="px-5 mb-4">
         <TextInput
-          className="bg-surface text-white rounded-xl px-4 py-3"
+          className="bg-surface-2 text-white rounded-lg px-4 py-3 border border-surface-3 text-base"
           placeholder="Search quests..."
           placeholderTextColor="#6b7280"
           value={search}
@@ -114,7 +114,7 @@ export default function Feed() {
       </View>
 
       {/* Tag filter chips */}
-      <View className="px-5 mb-1">
+      <View className="px-5 mb-3">
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -122,13 +122,19 @@ export default function Feed() {
           keyExtractor={(item) => item}
           renderItem={({ item }) => (
             <Pressable
-              className={`mr-2 px-3 py-1.5 rounded-full border ${
-                tagFilter === item ? 'bg-accent border-accent' : 'border-surface-2'
+              className={`mr-2 px-3 py-1.5 rounded-full border transition-all ${
+                tagFilter === item
+                  ? 'bg-accent border-accent shadow-accent-sm'
+                  : 'border-surface-3 bg-surface-2'
               }`}
               onPress={() => setTagFilter(item as typeof tagFilter)}
             >
-              <Text className={`text-sm ${tagFilter === item ? 'text-white' : 'text-muted'}`}>
-                {item === 'all' ? 'All' : item}
+              <Text
+                className={`text-sm font-semibold ${
+                  tagFilter === item ? 'text-white' : 'text-muted'
+                }`}
+              >
+                {item === 'all' ? 'All' : item.charAt(0).toUpperCase() + item.slice(1)}
               </Text>
             </Pressable>
           )}
@@ -140,13 +146,19 @@ export default function Feed() {
         {(['all', 'meetup', 'dropoff'] as const).map((m) => (
           <Pressable
             key={m}
-            className={`px-3 py-1.5 rounded-full border ${
-              modeFilter === m ? 'bg-surface-2 border-accent' : 'border-surface-2'
+            className={`px-3 py-1.5 rounded-full border transition-all ${
+              modeFilter === m
+                ? 'bg-accent border-accent shadow-accent-sm'
+                : 'border-surface-3 bg-surface-2'
             }`}
             onPress={() => setModeFilter(m)}
           >
-            <Text className={`text-xs ${modeFilter === m ? 'text-white' : 'text-muted'}`}>
-              {m === 'all' ? 'Any mode' : m === 'meetup' ? 'Meet Up' : 'Drop Off'}
+            <Text
+              className={`text-xs font-semibold ${
+                modeFilter === m ? 'text-white' : 'text-muted'
+              }`}
+            >
+              {m === 'all' ? 'Any mode' : m === 'meetup' ? '📍 Meet Up' : '📦 Drop Off'}
             </Text>
           </Pressable>
         ))}
@@ -155,7 +167,7 @@ export default function Feed() {
       {/* Quest list */}
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#6c63ff" size="large" />
+          <ActivityIndicator color="#7c3aed" size="large" />
         </View>
       ) : (
         <FlatList
@@ -170,16 +182,16 @@ export default function Feed() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#6c63ff"
+              tintColor="#7c3aed"
             />
           }
           ListEmptyComponent={
             <View className="items-center justify-center py-20">
-              <Text className="text-white font-semibold text-base">No quests yet</Text>
-              <Text className="text-muted text-sm mt-1 text-center">
+              <Text className="text-white font-semibold text-base">No quests available</Text>
+              <Text className="text-muted text-sm mt-2 text-center">
                 {search || tagFilter !== 'all' || modeFilter !== 'all'
                   ? 'Try adjusting your filters.'
-                  : 'Be the first to post one!'}
+                  : 'Check back soon for new quests!'}
               </Text>
             </View>
           }

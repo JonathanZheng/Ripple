@@ -69,39 +69,59 @@ export default function Verify() {
   }
 
   return (
-    <View className="flex-1 bg-background px-8 justify-center">
-      <Text className="text-3xl font-bold text-white mb-2">Verify your identity</Text>
-      <Text className="text-muted mb-8">
-        Upload a photo of your NUS Student Pass. This ensures every Ripple account is tied to a real student.
-      </Text>
+    <View className="flex-1 bg-background px-6 justify-center">
+      {/* Header */}
+      <View className="mb-8">
+        <Text className="text-4xl font-bold text-white mb-2">Verify your identity</Text>
+        <Text className="text-muted text-base">
+          Upload a photo of your NUS Student Pass to confirm you're a real student.
+        </Text>
+      </View>
 
-      {error ? <Text className="text-danger mb-4 text-sm">{error}</Text> : null}
+      {/* Error message */}
+      {error && (
+        <View className="bg-danger/15 border border-danger/30 rounded-lg px-4 py-3 mb-6">
+          <Text className="text-danger text-sm font-semibold">{error}</Text>
+        </View>
+      )}
 
+      {/* Image upload area */}
       <Pressable
-        className="bg-surface-2 border border-dashed border-muted rounded-2xl py-12 items-center mb-6"
+        className="bg-surface-2 border-2 border-dashed border-surface-3 rounded-2xl py-12 items-center justify-center mb-8 active:opacity-80"
         onPress={pickImage}
+        disabled={loading}
       >
         {imageUri ? (
-          <Image source={{ uri: imageUri }} className="w-full h-40 rounded-xl" resizeMode="contain" />
+          <View className="w-full items-center">
+            <Image source={{ uri: imageUri }} className="w-32 h-40 rounded-xl mb-3" resizeMode="contain" />
+            <Text className="text-accent font-semibold text-sm">Tap to change photo</Text>
+          </View>
         ) : (
-          <>
-            <Text className="text-4xl mb-2">🪪</Text>
-            <Text className="text-muted text-sm">Tap to upload Student Pass photo</Text>
-          </>
+          <View className="items-center">
+            <Text className="text-5xl mb-3">🪪</Text>
+            <Text className="text-white font-semibold text-base mb-1">Upload Student Pass</Text>
+            <Text className="text-muted text-sm">Tap to select a photo</Text>
+          </View>
         )}
       </Pressable>
 
+      {/* Verify Button */}
       <Pressable
-        className="bg-accent rounded-2xl py-4 items-center"
+        className="bg-accent rounded-lg py-4 items-center justify-center mb-4 shadow-md active:shadow-lg active:opacity-90"
         onPress={handleVerify}
         disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color="#fff" size="small" />
         ) : (
-          <Text className="text-white font-semibold text-base">Verify & Enter Ripple</Text>
+          <Text className="text-white font-bold text-base">Verify & Enter Ripple</Text>
         )}
       </Pressable>
+
+      {/* Info text */}
+      <Text className="text-muted text-xs text-center">
+        Your photo is securely stored and only used for verification purposes.
+      </Text>
     </View>
   );
 }

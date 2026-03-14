@@ -1,3 +1,112 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Base styles */
+@layer base {
+  * {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-background text-white;
+  }
+}
+
+/* Component utilities */
+@layer components {
+  /* Button base styles */
+  .btn-primary {
+    @apply bg-accent text-white font-semibold rounded-lg px-4 py-3 items-center justify-center active:opacity-80 disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply bg-surface-2 text-white font-semibold rounded-lg px-4 py-3 items-center justify-center border border-surface-3 active:opacity-80 disabled:opacity-50;
+  }
+
+  .btn-ghost {
+    @apply text-accent font-semibold px-3 py-2 active:opacity-70 disabled:opacity-50;
+  }
+
+  .btn-danger {
+    @apply bg-danger/20 text-danger font-semibold rounded-lg px-4 py-3 items-center justify-center active:opacity-80 disabled:opacity-50;
+  }
+
+  /* Input base styles */
+  .input-base {
+    @apply bg-surface-2 text-white rounded-lg px-4 py-3 border border-surface-3 text-base;
+  }
+
+  .input-base::placeholder {
+    @apply text-muted;
+  }
+
+  /* Card base styles */
+  .card {
+    @apply bg-surface rounded-xl border border-surface-2 shadow-sm;
+  }
+
+  .card-elevated {
+    @apply bg-surface rounded-xl border border-surface-2 shadow-md;
+  }
+
+  /* Badge styles */
+  .badge {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold;
+  }
+
+  .badge-primary {
+    @apply badge bg-accent/20 text-accent;
+  }
+
+  .badge-secondary {
+    @apply badge bg-surface-2 text-muted;
+  }
+
+  .badge-success {
+    @apply badge bg-success/20 text-success;
+  }
+
+  .badge-warning {
+    @apply badge bg-warning/20 text-warning;
+  }
+
+  .badge-danger {
+    @apply badge bg-danger/20 text-danger;
+  }
+
+  /* Text utilities */
+  .text-heading-1 {
+    @apply text-3xl font-bold text-white;
+  }
+
+  .text-heading-2 {
+    @apply text-2xl font-bold text-white;
+  }
+
+  .text-heading-3 {
+    @apply text-xl font-semibold text-white;
+  }
+
+  .text-body {
+    @apply text-base text-white;
+  }
+
+  .text-body-secondary {
+    @apply text-sm text-muted-light;
+  }
+
+  .text-caption {
+    @apply text-xs text-muted;
+  }
+
+  /* Divider */
+  .divider {
+    @apply h-px bg-surface-2;
+  }
+
+  /* Focus ring */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-background;
+  }
+}

@@ -44,46 +44,68 @@ export default function SignIn() {
   }
 
   return (
-    <View className="flex-1 bg-background px-8 justify-center">
-      <Text className="text-3xl font-bold text-white mb-8">Welcome back</Text>
+    <View className="flex-1 bg-background px-6 justify-center">
+      {/* Header */}
+      <View className="mb-8">
+        <Text className="text-4xl font-bold text-white mb-2">Welcome back</Text>
+        <Text className="text-muted text-base">Sign in to your Ripple account</Text>
+      </View>
 
-      {error ? <Text className="text-danger mb-4 text-sm">{error}</Text> : null}
+      {/* Error message */}
+      {error && (
+        <View className="bg-danger/15 border border-danger/30 rounded-lg px-4 py-3 mb-6">
+          <Text className="text-danger text-sm font-semibold">{error}</Text>
+        </View>
+      )}
 
-      <Text className="text-muted text-sm mb-1">Email or Display Name</Text>
-      <TextInput
-        className="bg-surface text-white rounded-xl px-4 py-3 mb-4"
-        placeholder="you@u.nus.edu or Alex Tan"
-        placeholderTextColor="#6b7280"
-        autoCapitalize="none"
-        autoCorrect={false}
-        value={identifier}
-        onChangeText={setIdentifier}
-      />
+      {/* Email/Display Name Input */}
+      <View className="mb-5">
+        <Text className="text-muted text-sm font-semibold mb-2">Email or Display Name</Text>
+        <TextInput
+          className="bg-surface-2 text-white rounded-lg px-4 py-3.5 border border-surface-3 text-base"
+          placeholder="you@u.nus.edu or Alex Tan"
+          placeholderTextColor="#6b7280"
+          autoCapitalize="none"
+          autoCorrect={false}
+          value={identifier}
+          onChangeText={setIdentifier}
+          editable={!loading}
+        />
+      </View>
 
-      <Text className="text-muted text-sm mb-1">Password</Text>
-      <TextInput
-        className="bg-surface text-white rounded-xl px-4 py-3 mb-6"
-        placeholder="••••••••"
-        placeholderTextColor="#6b7280"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+      {/* Password Input */}
+      <View className="mb-6">
+        <Text className="text-muted text-sm font-semibold mb-2">Password</Text>
+        <TextInput
+          className="bg-surface-2 text-white rounded-lg px-4 py-3.5 border border-surface-3 text-base"
+          placeholder="••••••••"
+          placeholderTextColor="#6b7280"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+          editable={!loading}
+        />
+      </View>
 
+      {/* Sign In Button */}
       <Pressable
-        className="bg-accent rounded-2xl py-4 items-center"
+        className="bg-accent rounded-lg py-4 items-center justify-center mb-6 shadow-md active:shadow-lg active:opacity-90"
         onPress={handleSignIn}
         disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color="#fff" size="small" />
         ) : (
-          <Text className="text-white font-semibold text-base">Sign In</Text>
+          <Text className="text-white font-bold text-base">Sign In</Text>
         )}
       </Pressable>
 
-      <Pressable className="mt-6 items-center" onPress={() => router.push('/(auth)/sign-up')}>
-        <Text className="text-muted">Don't have an account? <Text className="text-accent">Sign up</Text></Text>
+      {/* Sign Up Link */}
+      <Pressable className="items-center" onPress={() => router.push('/(auth)/sign-up')} disabled={loading}>
+        <Text className="text-muted text-sm">
+          Don't have an account?{' '}
+          <Text className="text-accent font-bold">Sign up</Text>
+        </Text>
       </Pressable>
     </View>
   );
