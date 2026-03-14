@@ -1,15 +1,15 @@
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
-import { useState } from 'react';
+import { View, Text, Pressable, ScrollView } from 'react-native';
+import { useState, useMemo } from 'react';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
+import { ProgressBar } from '@/components/ui/ProgressBar';
 import { MATRIC_REGEX } from '@/constants';
+import { ChevronLeft } from 'lucide-react-native';
 
 const RC_OPTIONS = ['Acacia', 'CAPT', 'NUSC', 'RC4', 'RVRC', 'Tembusu', 'UTR'];
 
@@ -22,23 +22,44 @@ export default function SignUp() {
   const [rc, setRc] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const insets = useSafeAreaInsets();
+
+  const errorY = useSharedValue(-16);
+  const errorOpacity = useSharedValue(0);
+  const errorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: errorY.value }],
+    opacity: errorOpacity.value,
+  }));
+
+  const completeness = useMemo(() => {
+    const fields = [displayName, email, password, confirmPassword, matricNumber, rc];
+    return fields.filter(Boolean).length / fields.length;
+  }, [displayName, email, password, confirmPassword, matricNumber, rc]);
+
+  function showError(msg: string) {
+    setError(msg);
+    errorY.value = -16;
+    errorOpacity.value = 0;
+    errorY.value = withSpring(0, { damping: 14, stiffness: 220 });
+    errorOpacity.value = withSpring(1, { damping: 14, stiffness: 220 });
+  }
 
   async function handleSignUp() {
     setError('');
     if (!displayName || !email || !password || !matricNumber || !rc) {
-      setError('All fields are required.');
+      showError('All fields are required.');
       return;
     }
     if (!MATRIC_REGEX.test(matricNumber)) {
-      setError('Matric number format is invalid (e.g. A0123456X).');
+      showError('Matric number format is invalid (e.g. A0123456X).');
       return;
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      showError('Password must be at least 6 characters.');
       return;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      showError('Passwords do not match.');
       return;
     }
 
@@ -48,13 +69,12 @@ export default function SignUp() {
         email,
         password,
         options: {
-          // Store profile data in user metadata so verify screen can read it
           data: { display_name: displayName, matric_number: matricNumber, rc },
         },
       });
 
       if (signUpError) {
-        setError(signUpError.message);
+        showError(signUpError.message);
         return;
       }
 
@@ -65,133 +85,103 @@ export default function SignUp() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 40 }}>
-      {/* Header */}
-      <View className="mb-8">
-        <Text className="text-4xl font-bold text-white mb-2">Create account</Text>
-        <Text className="text-muted text-base">Join Ripple and start helping</Text>
+    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+      {/* Progress bar */}
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
+        <ProgressBar progress={completeness} color="#7c3aed" height={2} />
       </View>
 
-      {/* Error message */}
-      {error && (
-        <View className="bg-danger/15 border border-danger/30 rounded-lg px-4 py-3 mb-6">
-          <Text className="text-danger text-sm font-semibold">{error}</Text>
-        </View>
-      )}
-
-      {/* Display Name Input */}
-      <View className="mb-5">
-        <Text className="text-muted text-sm font-semibold mb-2">Display Name</Text>
-        <TextInput
-          className="bg-surface-2 text-white rounded-lg px-4 py-3.5 border border-surface-3 text-base"
-          placeholder="e.g. Alex Tan"
-          placeholderTextColor="#6b7280"
-          value={displayName}
-          onChangeText={setDisplayName}
-          editable={!loading}
-        />
-      </View>
-
-      {/* NUS Email Input */}
-      <View className="mb-5">
-        <Text className="text-muted text-sm font-semibold mb-2">NUS Email</Text>
-        <TextInput
-          className="bg-surface-2 text-white rounded-lg px-4 py-3.5 border border-surface-3 text-base"
-          placeholder="eXXXXXXX@u.nus.edu"
-          placeholderTextColor="#6b7280"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          value={email}
-          onChangeText={setEmail}
-          editable={!loading}
-        />
-      </View>
-
-      {/* Password Input */}
-      <View className="mb-5">
-        <Text className="text-muted text-sm font-semibold mb-2">Password</Text>
-        <TextInput
-          className="bg-surface-2 text-white rounded-lg px-4 py-3.5 border border-surface-3 text-base"
-          placeholder="••••••••"
-          placeholderTextColor="#6b7280"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-          editable={!loading}
-        />
-      </View>
-
-      {/* Confirm Password Input */}
-      <View className="mb-5">
-        <Text className="text-muted text-sm font-semibold mb-2">Confirm Password</Text>
-        <TextInput
-          className="bg-surface-2 text-white rounded-lg px-4 py-3.5 border border-surface-3 text-base"
-          placeholder="••••••••"
-          placeholderTextColor="#6b7280"
-          secureTextEntry
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          editable={!loading}
-        />
-      </View>
-
-      {/* Matric Number Input */}
-      <View className="mb-5">
-        <Text className="text-muted text-sm font-semibold mb-2">Matric Number</Text>
-        <TextInput
-          className="bg-surface-2 text-white rounded-lg px-4 py-3.5 border border-surface-3 text-base"
-          placeholder="A0XXXXXXX"
-          placeholderTextColor="#6b7280"
-          autoCapitalize="characters"
-          value={matricNumber}
-          onChangeText={setMatricNumber}
-          editable={!loading}
-        />
-      </View>
-
-      {/* Residential College Selection */}
-      <View className="mb-6">
-        <Text className="text-muted text-sm font-semibold mb-3">Residential College</Text>
-        <View className="flex-row flex-wrap gap-2">
-          {RC_OPTIONS.map((option) => (
-            <Pressable
-              key={option}
-              className={`px-4 py-2 rounded-lg border transition-all ${
-                rc === option
-                  ? 'bg-accent border-accent shadow-accent-sm'
-                  : 'border-surface-3 bg-surface-2'
-              }`}
-              onPress={() => setRc(option)}
-              disabled={loading}
-            >
-              <Text className={`text-sm font-semibold ${rc === option ? 'text-white' : 'text-muted'}`}>
-                {option}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      {/* Sign Up Button */}
-      <Pressable
-        className="bg-accent rounded-lg py-4 items-center justify-center mb-6 shadow-md active:shadow-lg active:opacity-90"
-        onPress={handleSignUp}
-        disabled={loading}
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 24,
+          paddingTop: insets.top + 24,
+          paddingBottom: insets.bottom + 40,
+        }}
+        keyboardShouldPersistTaps="handled"
       >
-        {loading ? (
-          <ActivityIndicator color="#fff" size="small" />
-        ) : (
-          <Text className="text-white font-bold text-base">Create Account</Text>
-        )}
-      </Pressable>
+        {/* Back */}
+        <Pressable
+          onPress={() => router.back()}
+          style={{ marginBottom: 32, alignSelf: 'flex-start', padding: 4, marginLeft: -4 }}
+          hitSlop={12}
+        >
+          <ChevronLeft size={22} color="rgba(255,255,255,0.60)" strokeWidth={2} />
+        </Pressable>
 
-      {/* Sign In Link */}
-      <Pressable className="items-center" onPress={() => router.back()} disabled={loading}>
-        <Text className="text-muted text-sm">
-          Already have an account?{' '}
-          <Text className="text-accent font-bold">Sign in</Text>
-        </Text>
-      </Pressable>
-    </ScrollView>
+        {/* Header */}
+        <View style={{ marginBottom: 32 }}>
+          <Text style={{ color: '#ffffff', fontSize: 30, fontWeight: '700', letterSpacing: -1, marginBottom: 6 }}>
+            Create account
+          </Text>
+          <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 15, letterSpacing: -0.2 }}>
+            Join Ripple and start helping your college
+          </Text>
+        </View>
+
+        {/* Error */}
+        {error ? (
+          <Animated.View
+            style={[
+              errorStyle,
+              {
+                backgroundColor: 'rgba(239,68,68,0.08)',
+                borderWidth: 1,
+                borderColor: 'rgba(239,68,68,0.30)',
+                borderRadius: 14,
+                padding: 14,
+                marginBottom: 20,
+              },
+            ]}
+          >
+            <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '500' }}>{error}</Text>
+          </Animated.View>
+        ) : null}
+
+        {/* Inputs */}
+        <View style={{ gap: 14, marginBottom: 28 }}>
+          <Input label="Display name" placeholder="e.g. Alex Tan" value={displayName} onChangeText={setDisplayName} editable={!loading} />
+          <Input label="NUS email" placeholder="eXXXXXXX@u.nus.edu" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} editable={!loading} />
+          <Input label="Password" placeholder="at least 6 characters" secureTextEntry value={password} onChangeText={setPassword} editable={!loading} />
+          <Input label="Confirm password" placeholder="••••••••" secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} editable={!loading} />
+          <Input label="Matric number" placeholder="A0XXXXXXX" autoCapitalize="characters" value={matricNumber} onChangeText={setMatricNumber} editable={!loading} />
+        </View>
+
+        {/* RC Selection */}
+        <View style={{ marginBottom: 32 }}>
+          <Text style={{ color: 'rgba(255,255,255,0.50)', fontSize: 13, fontWeight: '500', marginBottom: 12, letterSpacing: -0.1 }}>
+            Residential College
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {RC_OPTIONS.map(option => (
+              <Chip
+                key={option}
+                label={option}
+                selected={rc === option}
+                onPress={() => setRc(option)}
+              />
+            ))}
+          </View>
+        </View>
+
+        {/* CTA */}
+        <Button
+          variant="primary"
+          size="lg"
+          loading={loading}
+          onPress={handleSignUp}
+          style={{ width: '100%', marginBottom: 20 }}
+        >
+          Create account
+        </Button>
+
+        {/* Link */}
+        <Pressable onPress={() => router.back()} disabled={loading} style={{ alignItems: 'center' }}>
+          <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 14 }}>
+            Already have an account?{' '}
+            <Text style={{ color: '#ffffff', fontWeight: '600' }}>Sign in</Text>
+          </Text>
+        </Pressable>
+      </ScrollView>
+    </View>
   );
 }

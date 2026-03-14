@@ -1,26 +1,35 @@
-import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  TextInput,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/useSession';
-import { TRUST_TIER_CONFIG } from '@/constants';
+import { TRUST_TIER_CONFIG, TAG_COLOURS } from '@/constants';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { Card } from '@/components/ui/Card';
+import { Avatar } from '@/components/ui/Avatar';
+import { Badge } from '@/components/ui/Badge';
+import { Chip } from '@/components/ui/Chip';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { X, Plus, Flame, AlertTriangle, Layers } from 'lucide-react-native';
+import { Pressable } from 'react-native';
 import type { Profile, Quest } from '@/types/database';
 
 type Tab = 'posted' | 'inprogress' | 'completed';
 
+const TABS: { value: Tab; label: string }[] = [
+  { value: 'posted',     label: 'Posted'      },
+  { value: 'inprogress', label: 'In Progress' },
+  { value: 'completed',  label: 'Completed'   },
+];
+
 export default function ProfileScreen() {
   const { session } = useSession();
   const userId = session?.user?.id;
+  const insets = useSafeAreaInsets();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,30 +43,20 @@ export default function ProfileScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!userId) return;
-
       async function load() {
         setLoading(true);
         const [profileRes, postedRes, inProgressRes, completedRes] = await Promise.all([
           supabase.from('profiles').select('*').eq('id', userId).single(),
           supabase.from('quests').select('*').eq('poster_id', userId).order('created_at', { ascending: false }),
-          supabase.from('quests').select('*')
-            .or(`poster_id.eq.${userId},acceptor_id.eq.${userId}`)
-            .eq('status', 'in_progress'),
-          supabase.from('quests').select('*')
-            .eq('acceptor_id', userId).eq('status', 'completed').order('created_at', { ascending: false }),
+          supabase.from('quests').select('*').or(`poster_id.eq.${userId},acceptor_id.eq.${userId}`).eq('status', 'in_progress'),
+          supabase.from('quests').select('*').eq('acceptor_id', userId).eq('status', 'completed').order('created_at', { ascending: false }),
         ]);
-
-        if (profileRes.data) {
-          const p = profileRes.data as Profile;
-          setProfile(p);
-          setLocalSkills(p.skills ?? []);
-        }
+        if (profileRes.data) { const p = profileRes.data as Profile; setProfile(p); setLocalSkills(p.skills ?? []); }
         if (postedRes.data) setPostedQuests(postedRes.data as Quest[]);
         if (inProgressRes.data) setInProgressQuests(inProgressRes.data as Quest[]);
         if (completedRes.data) setCompletedQuests(completedRes.data as Quest[]);
         setLoading(false);
       }
-
       load();
     }, [userId])
   );
@@ -78,70 +77,52 @@ export default function ProfileScreen() {
     await supabase.from('profiles').update({ skills: newSkills }).eq('id', userId);
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
-
   if (loading && !profile) {
     return (
-      <View className="flex-1 bg-background items-center justify-center">
-        <ActivityIndicator color="#7c3aed" size="large" />
+      <View style={{ flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color="rgba(255,255,255,0.30)" size="large" />
       </View>
     );
   }
 
   if (!profile) {
     return (
-      <View className="flex-1 bg-background items-center justify-center px-8">
-        <Text className="text-white text-base font-semibold">No profile found.</Text>
+      <View style={{ flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+        <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '600' }}>No profile found.</Text>
       </View>
     );
   }
 
   const tierConfig = TRUST_TIER_CONFIG[profile.trust_tier];
-  const initials = profile.display_name
-    .split(' ')
-    .map(w => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-
   const tabQuests: Quest[] =
     activeTab === 'posted' ? postedQuests :
     activeTab === 'inprogress' ? inProgressQuests :
     completedQuests;
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 32 }}>
+    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
+        <ScreenHeader title="Profile" />
 
-        {/* Header with profile info */}
-        <View className="px-5 pt-6 pb-6 gap-4">
-          <View className="flex-row items-start justify-between">
-            <View className="flex-row items-center gap-4 flex-1">
-              <View
-                className="w-16 h-16 rounded-2xl items-center justify-center shadow-md"
-                style={{ backgroundColor: tierConfig.colour + '20' }}
-              >
-                <Text style={{ color: tierConfig.colour }} className="text-2xl font-bold">{initials}</Text>
-              </View>
-
-              <View className="flex-1">
-                <Text className="text-white text-xl font-bold">{profile.display_name}</Text>
-                <Text className="text-muted text-sm mt-0.5">{profile.rc}</Text>
-                <View className="flex-row items-center gap-2 mt-2">
-                  <View
-                    className="rounded-full px-3 py-1"
-                    style={{ backgroundColor: tierConfig.colour + '15' }}
-                  >
-                    <Text className="text-xs font-bold" style={{ color: tierConfig.colour }}>
-                      {tierConfig.label}
-                    </Text>
-                  </View>
+        {/* Profile hero */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+          <Card variant="elevated">
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+              <Avatar name={profile.display_name} size="lg" tierColor={tierConfig.colour} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#ffffff', fontSize: 19, fontWeight: '700', letterSpacing: -0.5, marginBottom: 3 }}>
+                  {profile.display_name}
+                </Text>
+                <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, marginBottom: 8 }}>
+                  {profile.rc}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Badge variant="tier" value={profile.trust_tier} color={tierConfig.colour} />
                   {(profile.streak_count ?? 0) > 0 && (
-                    <View className="bg-warning/15 rounded-full px-2 py-1">
-                      <Text className="text-warning text-xs font-bold">
-                        🔥 {profile.streak_count}d
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(245,158,11,0.10)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.20)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+                      <Flame size={12} color="#f59e0b" strokeWidth={2.5} />
+                      <Text style={{ color: '#f59e0b', fontSize: 11, fontWeight: '700' }}>
+                        {profile.streak_count}d
                       </Text>
                     </View>
                   )}
@@ -149,135 +130,153 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            <Pressable onPress={handleSignOut} className="p-2 -mr-2">
-              <Text className="text-muted text-xs font-semibold">Sign out</Text>
-            </Pressable>
-          </View>
-
-          {/* Stats row */}
-          <View className="bg-surface-2 rounded-2xl p-4 border border-surface-3 flex-row justify-around">
-            <View className="items-center flex-1">
-              <Text className="text-white font-bold text-xl">{postedQuests.length}</Text>
-              <Text className="text-muted text-xs mt-1 font-semibold">Posted</Text>
+            {/* Stats */}
+            <View style={{ flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, overflow: 'hidden' }}>
+              {[
+                { label: 'Posted', value: String(postedQuests.length) },
+                { label: 'Completed', value: String(profile.quests_completed ?? 0) },
+                { label: 'Rating', value: (profile.avg_rating ?? 0).toFixed(1), color: '#f59e0b' },
+              ].map((stat, i, arr) => (
+                <View key={stat.label} style={{ flex: 1, alignItems: 'center', paddingVertical: 14, borderRightWidth: i < arr.length - 1 ? 1 : 0, borderRightColor: 'rgba(255,255,255,0.06)' }}>
+                  <Text style={{ color: stat.color ?? '#ffffff', fontWeight: '800', fontSize: 20, letterSpacing: -0.5, marginBottom: 3 }}>
+                    {stat.value}
+                  </Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '500' }}>
+                    {stat.label}
+                  </Text>
+                </View>
+              ))}
             </View>
-            <View className="w-px bg-surface-3" />
-            <View className="items-center flex-1">
-              <Text className="text-white font-bold text-xl">{profile.quests_completed ?? 0}</Text>
-              <Text className="text-muted text-xs mt-1 font-semibold">Completed</Text>
-            </View>
-            <View className="w-px bg-surface-3" />
-            <View className="items-center flex-1">
-              <Text className="text-warning font-bold text-xl">{(profile.avg_rating ?? 0).toFixed(1)}</Text>
-              <Text className="text-muted text-xs mt-1 font-semibold">Rating</Text>
-            </View>
-          </View>
+          </Card>
         </View>
 
         {/* Strikes warning */}
         {(profile.strikes ?? 0) > 0 && (
-          <View className="mx-5 mb-4 bg-danger/10 border border-danger/30 rounded-2xl px-4 py-3 flex-row items-center gap-3">
-            <Text className="text-danger text-lg">⚠️</Text>
-            <View className="flex-1">
-              <Text className="text-danger font-bold text-sm">
-                {profile.strikes} Strike{profile.strikes > 1 ? 's' : ''}
-              </Text>
-              <Text className="text-danger/70 text-xs mt-0.5">
-                {profile.strikes >= 3
-                  ? 'Account under review'
-                  : `${3 - profile.strikes} more until review`}
-              </Text>
-            </View>
+          <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+            <Card style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.20)' }}>
+              <AlertTriangle size={16} color="#ef4444" strokeWidth={2} style={{ marginTop: 1 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#ef4444', fontWeight: '700', fontSize: 14, marginBottom: 2 }}>
+                  {profile.strikes} Strike{profile.strikes > 1 ? 's' : ''}
+                </Text>
+                <Text style={{ color: 'rgba(239,68,68,0.70)', fontSize: 13 }}>
+                  {profile.strikes >= 3 ? 'Account under review' : `${3 - profile.strikes} more until review`}
+                </Text>
+              </View>
+            </Card>
           </View>
         )}
 
-        {/* Skills section */}
-        <View className="mx-5 mb-6 gap-3">
-          <Text className="text-white font-bold text-base">Skills & Interests</Text>
-          <View className="flex-row flex-wrap gap-2">
+        {/* Skills */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
+          <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 12 }}>
+            SKILLS & INTERESTS
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
             {localSkills.map((skill, i) => (
-              <Pressable
+              <View
                 key={i}
-                onPress={() => handleRemoveSkill(i)}
-                className="bg-accent/15 border border-accent/40 rounded-full px-3 py-1.5 flex-row items-center gap-1.5"
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(124,58,237,0.10)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.22)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}
               >
-                <Text className="text-accent text-sm font-semibold">{skill}</Text>
-                <Text className="text-accent/60 text-xs font-bold">×</Text>
-              </Pressable>
+                <Text style={{ color: '#a78bfa', fontSize: 13, fontWeight: '500' }}>{skill}</Text>
+                <Pressable onPress={() => handleRemoveSkill(i)} hitSlop={8}>
+                  <X size={12} color="rgba(167,139,250,0.50)" strokeWidth={2.5} />
+                </Pressable>
+              </View>
             ))}
           </View>
-          <View className="flex-row gap-2">
-            <TextInput
-              value={skillInput}
-              onChangeText={setSkillInput}
-              placeholder="Add a skill..."
-              placeholderTextColor="#6b7280"
-              className="flex-1 bg-surface-2 rounded-lg px-4 py-3 text-white text-sm border border-surface-3"
-              returnKeyType="done"
-              onSubmitEditing={handleAddSkill}
-            />
-            <Pressable
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Input
+                placeholder="Add a skill..."
+                value={skillInput}
+                onChangeText={setSkillInput}
+                returnKeyType="done"
+                onSubmitEditing={handleAddSkill}
+                leftIcon={Plus}
+              />
+            </View>
+            <Button
+              variant="secondary"
+              size="md"
               onPress={handleAddSkill}
               disabled={!skillInput.trim()}
-              style={{ opacity: skillInput.trim() ? 1 : 0.4 }}
-              className="bg-accent rounded-lg px-4 py-3 items-center justify-center"
             >
-              <Text className="text-white font-bold text-sm">Add</Text>
-            </Pressable>
+              Add
+            </Button>
           </View>
-          {localSkills.length > 0 && (
-            <Text className="text-muted text-xs">Tap a skill to remove it.</Text>
-          )}
         </View>
 
         {/* Quest history */}
-        <View className="mx-5 gap-4">
-          <Text className="text-white font-bold text-base">Quest History</Text>
+        <View style={{ paddingHorizontal: 20 }}>
+          <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 12 }}>
+            QUEST HISTORY
+          </Text>
 
-          <View className="flex-row bg-surface-2 rounded-lg p-1 gap-1 border border-surface-3">
-            {([['posted', 'Posted'], ['inprogress', 'In Progress'], ['completed', 'Completed']] as [Tab, string][]).map(
-              ([tab, label]) => (
-                <Pressable
-                  key={tab}
-                  onPress={() => setActiveTab(tab)}
-                  className={`flex-1 rounded-md py-2.5 items-center transition-all ${activeTab === tab ? 'bg-accent shadow-accent-sm' : ''}`}
-                >
-                  <Text className={`text-xs font-bold ${activeTab === tab ? 'text-white' : 'text-muted'}`}>
-                    {label}
-                  </Text>
-                </Pressable>
-              )
-            )}
+          {/* Tab selector */}
+          <View style={{ flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 4, gap: 4, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' }}>
+            {TABS.map(({ value, label }) => (
+              <View
+                key={value}
+                style={{ flex: 1, borderRadius: 10, backgroundColor: activeTab === value ? '#ffffff' : 'transparent', overflow: 'hidden' }}
+              >
+                <Chip
+                  label={label}
+                  selected={activeTab === value}
+                  onPress={() => setActiveTab(value)}
+                  style={{
+                    width: '100%',
+                    alignItems: 'center',
+                    paddingHorizontal: 4,
+                    borderRadius: 10,
+                    borderWidth: 0,
+                    backgroundColor: 'transparent',
+                  }}
+                />
+              </View>
+            ))}
           </View>
 
           {loading ? (
-            <ActivityIndicator color="#7c3aed" style={{ marginTop: 24 }} />
+            <ActivityIndicator color="rgba(255,255,255,0.30)" style={{ marginTop: 24 }} />
           ) : tabQuests.length === 0 ? (
-            <View className="py-12 items-center">
-              <Text className="text-muted text-sm">No quests here yet.</Text>
+            <View style={{ paddingVertical: 48, alignItems: 'center' }}>
+              <Layers size={36} color="rgba(255,255,255,0.08)" strokeWidth={1.5} />
+              <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 14, marginTop: 12 }}>
+                No quests here yet
+              </Text>
             </View>
           ) : (
-            tabQuests.map(quest => (
-              <Pressable
-                key={quest.id}
-                onPress={() => router.push(`/quest/${quest.id}`)}
-                className="bg-surface-2 rounded-xl p-4 border border-surface-3 shadow-sm active:shadow-md active:opacity-95"
-              >
-                <Text className="text-white font-bold text-base" numberOfLines={1}>
-                  {quest.ai_generated_title ?? quest.title}
-                </Text>
-                <View className="flex-row items-center justify-between mt-3">
-                  <Text className="text-accent font-bold text-sm">
-                    {quest.reward_amount > 0 ? `$${quest.reward_amount.toFixed(2)}` : 'Favour'}
-                  </Text>
-                  <Text className="text-muted text-xs">
-                    {formatDistanceToNow(new Date(quest.deadline), { addSuffix: true })}
-                  </Text>
-                </View>
-              </Pressable>
-            ))
+            <View style={{ gap: 8 }}>
+              {tabQuests.map(quest => (
+                <Card
+                  key={quest.id}
+                  onPress={() => router.push(`/quest/${quest.id}`)}
+                >
+                  {/* Tag color accent */}
+                  <View style={{ position: 'absolute', left: 0, top: 16, bottom: 16, width: 3, borderRadius: 999, backgroundColor: (TAG_COLOURS as Record<string, string>)[quest.tag] ?? 'rgba(255,255,255,0.20)' }} />
+                  <View style={{ paddingLeft: 12 }}>
+                    <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 15, letterSpacing: -0.3, marginBottom: 8 }} numberOfLines={1}>
+                      {quest.ai_generated_title ?? quest.title}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Badge variant="status" value={quest.status} />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <Text style={{ color: '#a78bfa', fontWeight: '700', fontSize: 13 }}>
+                          {quest.reward_amount > 0 ? `$${quest.reward_amount.toFixed(2)}` : 'Favour'}
+                        </Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 12 }}>
+                          {formatDistanceToNow(new Date(quest.deadline), { addSuffix: true })}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </Card>
+              ))}
+            </View>
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

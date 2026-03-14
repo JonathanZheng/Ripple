@@ -6,9 +6,9 @@ export const QUEST_TAGS = ['food', 'transport', 'social', 'skills', 'errands'] a
 export const TAG_COLOURS: Record<string, string> = {
   food:      '#f97316',
   transport: '#3b82f6',
-  social:    '#a855f7',
-  skills:    '#22c55e',
-  errands:   '#eab308',
+  social:    '#d946ef',
+  skills:    '#10b981',
+  errands:   '#f59e0b',
 };
 
 export const TRUST_TIER_CONFIG = {

@@ -10,6 +10,8 @@
 
   body {
     @apply bg-background text-white;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 

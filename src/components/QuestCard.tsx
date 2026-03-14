@@ -1,8 +1,12 @@
-import { View, Text, Pressable } from 'react-native';
+import { View, Text } from 'react-native';
 import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { formatDistanceToNow, isPast } from 'date-fns';
 import { TAG_COLOURS, TRUST_TIER_CONFIG } from '@/constants';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { ProgressBar } from '@/components/ui/ProgressBar';
+import { Zap, Clock, MapPin } from 'lucide-react-native';
 import type { Quest, TrustTier } from '@/types/database';
 
 interface Props {
@@ -18,113 +22,137 @@ function canAccept(quest: Quest, tier: TrustTier): { ok: boolean; reason?: strin
   return { ok: true };
 }
 
+function FlashCountdown({ expiresAt }: { expiresAt: string }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const secondsLeft = Math.max(0, Math.floor((new Date(expiresAt).getTime() - now.getTime()) / 1000));
+  const totalSeconds = 30 * 60;
+  const progress = secondsLeft / totalSeconds;
+  const mins = Math.floor(secondsLeft / 60);
+  const secs = secondsLeft % 60;
+  const urgent = secondsLeft < 300;
+
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <Zap size={13} color="#f59e0b" strokeWidth={2.5} />
+        <Text style={{ color: '#f59e0b', fontSize: 11, fontWeight: '700', letterSpacing: 0.3 }}>
+          FLASH QUEST
+        </Text>
+        <View style={{ backgroundColor: 'rgba(245,158,11,0.12)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+          <Text style={{ color: urgent ? '#ef4444' : '#f59e0b', fontSize: 11, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+            {mins}:{String(secs).padStart(2, '0')}
+          </Text>
+        </View>
+      </View>
+      <ProgressBar progress={progress} color={urgent ? '#ef4444' : '#f59e0b'} height={2} />
+    </View>
+  );
+}
+
 export function QuestCard({ quest, userTier }: Props) {
   const eligibility = canAccept(quest, userTier);
   const deadlineDate = new Date(quest.deadline);
   const expired = isPast(deadlineDate);
-  const timeLeft = expired
-    ? 'Expired'
-    : `${formatDistanceToNow(deadlineDate)} left`;
+  const timeLeft = expired ? 'Expired' : `${formatDistanceToNow(deadlineDate)} left`;
 
   const displayTitle = quest.ai_generated_title || quest.title;
-  const tagColour = TAG_COLOURS[quest.tag] ?? '#6b7280';
   const tierConfig = TRUST_TIER_CONFIG[userTier];
 
-  // Flash countdown timer
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    if (!quest.is_flash || !quest.flash_expires_at) return;
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, [quest.is_flash, quest.flash_expires_at]);
-
-  const flashExpiresAt = quest.flash_expires_at ? new Date(quest.flash_expires_at) : null;
-  const flashSecondsLeft = flashExpiresAt
-    ? Math.max(0, Math.floor((flashExpiresAt.getTime() - now.getTime()) / 1000))
-    : 0;
-  const flashMins = Math.floor(flashSecondsLeft / 60);
-  const flashSecs = flashSecondsLeft % 60;
-  const flashCountdown = `${flashMins}:${String(flashSecs).padStart(2, '0')}`;
-
-  const isFlashExpired =
-    quest.is_flash && quest.flash_expires_at && isPast(new Date(quest.flash_expires_at));
+  const flashExpiresAt = quest.flash_expires_at;
+  const isFlashExpired = quest.is_flash && flashExpiresAt && isPast(new Date(flashExpiresAt));
 
   if (isFlashExpired || expired) return null;
 
   return (
-    <Pressable
+    <Card
       onPress={() => router.push(`/quest/${quest.id}`)}
-      className="bg-surface-2 rounded-2xl p-4 mb-3 border border-surface-3 shadow-md active:shadow-lg active:opacity-95"
-      style={{ opacity: eligibility.ok ? 1 : 0.6 }}
+      style={{ marginBottom: 10, opacity: eligibility.ok ? 1 : 0.55 }}
     >
-      {/* Flash badge with live countdown */}
-      {quest.is_flash && (
-        <View className="flex-row items-center gap-2 mb-3">
-          <View className="bg-warning/20 border border-warning rounded-full px-2.5 py-1">
-            <Text className="text-warning text-xs font-bold">⚡ Flash Quest</Text>
-          </View>
-          <View className="bg-surface-3 rounded-full px-2.5 py-1 border border-surface-3">
-            <Text className="text-warning text-xs font-mono font-semibold">{flashCountdown}</Text>
-          </View>
-        </View>
+      {/* Flash countdown */}
+      {quest.is_flash && flashExpiresAt && (
+        <FlashCountdown expiresAt={flashExpiresAt} />
       )}
 
-      {/* Tag + fulfilment row */}
-      <View className="flex-row items-center gap-2 mb-3 flex-wrap">
-        <View
-          className="rounded-full px-2.5 py-1"
-          style={{ backgroundColor: tagColour + '22' }}
-        >
-          <Text style={{ color: tagColour }} className="text-xs font-bold">
-            {quest.tag.charAt(0).toUpperCase() + quest.tag.slice(1)}
-          </Text>
-        </View>
-
-        <View className="bg-surface-3 rounded-full px-2.5 py-1 border border-surface-3">
-          <Text className="text-muted text-xs font-medium">
-            {quest.fulfilment_mode === 'meetup' ? '📍 Meet Up' : '📦 Drop Off'}
-          </Text>
-        </View>
-
+      {/* Tag + mode + location row */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+        <Badge variant="tag" value={quest.tag} />
+        <Badge variant="mode" value={quest.fulfilment_mode} />
         {quest.location_name && (
-          <Text className="text-muted text-xs flex-1" numberOfLines={1}>
-            {quest.location_name}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
+            <MapPin size={11} color="rgba(255,255,255,0.30)" strokeWidth={2} />
+            <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 11 }} numberOfLines={1}>
+              {quest.location_name}
+            </Text>
+          </View>
         )}
       </View>
 
       {/* Title */}
-      <Text className="text-white font-bold text-base mb-2 leading-snug" numberOfLines={2}>
+      <Text
+        style={{ color: '#ffffff', fontWeight: '700', fontSize: 15, marginBottom: 6, letterSpacing: -0.3, lineHeight: 21 }}
+        numberOfLines={2}
+      >
         {displayTitle}
       </Text>
 
-      {/* Description preview */}
-      <Text className="text-muted-light text-sm mb-4" numberOfLines={2}>
+      {/* Description */}
+      <Text
+        style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 19, marginBottom: 16 }}
+        numberOfLines={2}
+      >
         {quest.description}
       </Text>
 
-      {/* Bottom row: reward + deadline */}
-      <View className="flex-row items-center justify-between">
-        <View>
-          <Text className="text-accent-light text-xs font-semibold mb-0.5">Reward</Text>
-          <Text className="text-accent font-bold text-lg">
+      {/* Bottom row */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        {/* Reward */}
+        <View
+          style={{
+            backgroundColor: 'rgba(124,58,237,0.12)',
+            borderWidth: 1,
+            borderColor: 'rgba(124,58,237,0.25)',
+            borderRadius: 10,
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+          }}
+        >
+          <Text style={{ color: '#a78bfa', fontSize: 14, fontWeight: '700', letterSpacing: -0.3 }}>
             {quest.reward_amount > 0 ? `$${quest.reward_amount.toFixed(2)}` : 'Favour'}
           </Text>
         </View>
-        <View className="items-end">
-          <Text className="text-muted text-xs mb-0.5">Deadline</Text>
-          <Text className="text-muted-light text-xs font-semibold">{timeLeft}</Text>
+
+        {/* Deadline */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <Clock size={12} color="rgba(255,255,255,0.30)" strokeWidth={2} />
+          <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 12, fontWeight: '500' }}>
+            {timeLeft}
+          </Text>
         </View>
       </View>
 
       {/* Ineligibility notice */}
       {!eligibility.ok && (
-        <View className="mt-3 bg-danger/10 rounded-lg px-3 py-2 border border-danger/20">
-          <Text className="text-danger text-xs font-semibold">
+        <View
+          style={{
+            marginTop: 12,
+            backgroundColor: 'rgba(239,68,68,0.08)',
+            borderWidth: 1,
+            borderColor: 'rgba(239,68,68,0.20)',
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+          }}
+        >
+          <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '500' }}>
             {eligibility.reason} — you are {tierConfig.label}
           </Text>
         </View>
       )}
-    </Pressable>
+    </Card>
   );
 }

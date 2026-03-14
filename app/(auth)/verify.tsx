@@ -1,13 +1,18 @@
-import { View, Text, Pressable, Image, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, Image } from 'react-native';
 import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { ChevronLeft, Upload, CheckCircle, Info } from 'lucide-react-native';
 
 export default function Verify() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const insets = useSafeAreaInsets();
 
   async function pickImage() {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -16,6 +21,7 @@ export default function Verify() {
     });
     if (!result.canceled) {
       setImageUri(result.assets[0].uri);
+      setError('');
     }
   }
 
@@ -39,14 +45,11 @@ export default function Verify() {
         rc: string;
       };
 
-      // Upload student pass photo to storage
       const ext = imageUri.split('.').pop() ?? 'jpg';
       const path = `${user.id}.${ext}`;
       const blob = await (await fetch(imageUri)).blob();
       await supabase.storage.from('student-passes').upload(path, blob, { upsert: true });
-      // Upload failure is non-fatal — proceed even if bucket doesn't exist yet
 
-      // Create profile row — mock verification accepts any photo upload
       const { error: insertError } = await supabase.from('profiles').insert({
         id: user.id,
         display_name: meta.display_name,
@@ -54,12 +57,9 @@ export default function Verify() {
         rc: meta.rc,
       });
 
-      if (insertError) {
-        // code '23505' = unique_violation — profile already exists, safe to proceed
-        if (insertError.code !== '23505') {
-          setError(insertError.message);
-          return;
-        }
+      if (insertError && insertError.code !== '23505') {
+        setError(insertError.message);
+        return;
       }
 
       router.replace('/(tabs)/feed');
@@ -69,59 +69,89 @@ export default function Verify() {
   }
 
   return (
-    <View className="flex-1 bg-background px-6 justify-center">
+    <View style={{ flex: 1, backgroundColor: '#000000', paddingHorizontal: 24, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 40, justifyContent: 'center' }}>
+      {/* Back */}
+      <Pressable
+        onPress={() => router.back()}
+        style={{ marginBottom: 32, alignSelf: 'flex-start', padding: 4, marginLeft: -4 }}
+        hitSlop={12}
+      >
+        <ChevronLeft size={22} color="rgba(255,255,255,0.60)" strokeWidth={2} />
+      </Pressable>
+
       {/* Header */}
-      <View className="mb-8">
-        <Text className="text-4xl font-bold text-white mb-2">Verify your identity</Text>
-        <Text className="text-muted text-base">
+      <View style={{ marginBottom: 32 }}>
+        <Text style={{ color: '#ffffff', fontSize: 28, fontWeight: '700', letterSpacing: -0.8, marginBottom: 8 }}>
+          Verify your identity
+        </Text>
+        <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 15, lineHeight: 22 }}>
           Upload a photo of your NUS Student Pass to confirm you're a real student.
         </Text>
       </View>
 
-      {/* Error message */}
-      {error && (
-        <View className="bg-danger/15 border border-danger/30 rounded-lg px-4 py-3 mb-6">
-          <Text className="text-danger text-sm font-semibold">{error}</Text>
+      {/* Error */}
+      {error ? (
+        <View style={{ backgroundColor: 'rgba(239,68,68,0.08)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.30)', borderRadius: 14, padding: 14, marginBottom: 20 }}>
+          <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '500' }}>{error}</Text>
         </View>
-      )}
+      ) : null}
 
-      {/* Image upload area */}
+      {/* Upload area */}
       <Pressable
-        className="bg-surface-2 border-2 border-dashed border-surface-3 rounded-2xl py-12 items-center justify-center mb-8 active:opacity-80"
         onPress={pickImage}
         disabled={loading}
+        style={{
+          backgroundColor: 'rgba(255,255,255,0.03)',
+          borderWidth: 1.5,
+          borderStyle: 'dashed',
+          borderColor: imageUri ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)',
+          borderRadius: 20,
+          paddingVertical: 44,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 16,
+          position: 'relative',
+        }}
       >
         {imageUri ? (
-          <View className="w-full items-center">
-            <Image source={{ uri: imageUri }} className="w-32 h-40 rounded-xl mb-3" resizeMode="contain" />
-            <Text className="text-accent font-semibold text-sm">Tap to change photo</Text>
+          <View style={{ alignItems: 'center' }}>
+            <View style={{ position: 'relative' }}>
+              <Image source={{ uri: imageUri }} style={{ width: 120, height: 150, borderRadius: 12 }} resizeMode="contain" />
+              <View style={{ position: 'absolute', top: -8, right: -8, backgroundColor: '#10b981', borderRadius: 999, padding: 3 }}>
+                <CheckCircle size={16} color="#ffffff" strokeWidth={2.5} />
+              </View>
+            </View>
+            <Text style={{ color: 'rgba(255,255,255,0.50)', fontSize: 13, marginTop: 14 }}>Tap to change</Text>
           </View>
         ) : (
-          <View className="items-center">
-            <Text className="text-5xl mb-3">🪪</Text>
-            <Text className="text-white font-semibold text-base mb-1">Upload Student Pass</Text>
-            <Text className="text-muted text-sm">Tap to select a photo</Text>
+          <View style={{ alignItems: 'center', gap: 10 }}>
+            <View style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14, padding: 16 }}>
+              <Upload size={24} color="rgba(255,255,255,0.50)" strokeWidth={1.8} />
+            </View>
+            <Text style={{ color: '#ffffff', fontSize: 15, fontWeight: '600', letterSpacing: -0.2 }}>Upload Student Pass</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 13 }}>Tap to select a photo</Text>
           </View>
         )}
       </Pressable>
 
-      {/* Verify Button */}
-      <Pressable
-        className="bg-accent rounded-lg py-4 items-center justify-center mb-4 shadow-md active:shadow-lg active:opacity-90"
+      {/* Info callout */}
+      <Card style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 28, padding: 14 }}>
+        <Info size={16} color="rgba(255,255,255,0.40)" strokeWidth={2} style={{ marginTop: 1 }} />
+        <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 13, flex: 1, lineHeight: 19 }}>
+          Your photo is securely stored and only used for student verification purposes.
+        </Text>
+      </Card>
+
+      {/* CTA */}
+      <Button
+        variant="primary"
+        size="lg"
+        loading={loading}
         onPress={handleVerify}
-        disabled={loading}
+        style={{ width: '100%' }}
       >
-        {loading ? (
-          <ActivityIndicator color="#fff" size="small" />
-        ) : (
-          <Text className="text-white font-bold text-base">Verify & Enter Ripple</Text>
-        )}
-      </Pressable>
-
-      {/* Info text */}
-      <Text className="text-muted text-xs text-center">
-        Your photo is securely stored and only used for verification purposes.
-      </Text>
+        Verify identity
+      </Button>
     </View>
   );
 }

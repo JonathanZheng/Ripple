@@ -6,11 +6,11 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Brand colours — enhanced
-        background:  '#0a0a0f',
-        surface:     '#16161f',
-        'surface-2': '#1f1f2e',
-        'surface-3': '#2a2a3e',
+        // Brand colours — black/glass SaaS
+        background:  '#000000',
+        surface:     'rgba(255,255,255,0.03)',
+        'surface-2': 'rgba(255,255,255,0.06)',
+        'surface-3': 'rgba(255,255,255,0.10)',
         accent:      '#7c3aed',
         'accent-2':  '#ec4899',
         'accent-light': '#a78bfa',

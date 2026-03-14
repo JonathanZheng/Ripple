@@ -1,17 +1,17 @@
-import {
-  View,
-  Text,
-  ScrollView,
-  ActivityIndicator,
-  Pressable,
-} from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
 import { RC_OPTIONS, TRUST_TIER_CONFIG } from '@/constants';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { ProgressBar } from '@/components/ui/ProgressBar';
+import { RefreshCw } from 'lucide-react-native';
 import type { Profile } from '@/types/database';
 
 type RCEntry = {
@@ -20,12 +20,11 @@ type RCEntry = {
   topContributor: { display_name: string; count: number; trust_tier: Profile['trust_tier'] } | null;
 };
 
-const MEDAL = ['🥇', '🥈', '🥉'];
-
 export default function LeaderboardScreen() {
   const { session } = useSession();
   const userId = session?.user?.id;
   const { profile: myProfile } = useProfile(userId);
+  const insets = useSafeAreaInsets();
 
   const [entries, setEntries] = useState<RCEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,11 +33,10 @@ export default function LeaderboardScreen() {
   const fetchLeaderboard = useCallback(async () => {
     setLoading(true);
     const now = new Date();
-    const weekStart = startOfWeek(now, { weekStartsOn: 1 }); // Monday
+    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
     setWeekLabel(`${format(weekStart, 'MMM d')} – ${format(weekEnd, 'MMM d')}`);
 
-    // Fetch all completed quests this week with acceptor_id set
     const { data: quests } = await supabase
       .from('quests')
       .select('acceptor_id')
@@ -53,7 +51,6 @@ export default function LeaderboardScreen() {
       return;
     }
 
-    // Fetch unique acceptor profiles
     const uniqueIds = [...new Set(quests.map(q => q.acceptor_id as string))];
     const { data: profiles } = await supabase
       .from('profiles')
@@ -62,11 +59,9 @@ export default function LeaderboardScreen() {
 
     if (!profiles) { setLoading(false); return; }
 
-    // Build a map: acceptorId → profile
     const profileMap = new Map<string, typeof profiles[0]>();
     profiles.forEach(p => profileMap.set(p.id, p));
 
-    // Count quests per RC and per user
     const rcQuestCount: Record<string, number> = {};
     const userQuestCount: Record<string, number> = {};
 
@@ -77,27 +72,20 @@ export default function LeaderboardScreen() {
       userQuestCount[p.id] = (userQuestCount[p.id] ?? 0) + 1;
     }
 
-    // Build leaderboard entries for each RC
     const result: RCEntry[] = RC_OPTIONS.map(rc => {
       const questCount = rcQuestCount[rc] ?? 0;
-
-      // Find top contributor in this RC
       let topContributor: RCEntry['topContributor'] = null;
       let topCount = 0;
-      profiles
-        .filter(p => p.rc === rc)
-        .forEach(p => {
-          const count = userQuestCount[p.id] ?? 0;
-          if (count > topCount) {
-            topCount = count;
-            topContributor = { display_name: p.display_name, count, trust_tier: p.trust_tier as Profile['trust_tier'] };
-          }
-        });
-
+      profiles.filter(p => p.rc === rc).forEach(p => {
+        const count = userQuestCount[p.id] ?? 0;
+        if (count > topCount) {
+          topCount = count;
+          topContributor = { display_name: p.display_name, count, trust_tier: p.trust_tier as Profile['trust_tier'] };
+        }
+      });
       return { rc, questCount, topContributor };
     });
 
-    // Sort by quest count descending
     result.sort((a, b) => b.questCount - a.questCount);
     setEntries(result);
     setLoading(false);
@@ -105,45 +93,55 @@ export default function LeaderboardScreen() {
 
   useEffect(() => { fetchLeaderboard(); }, [fetchLeaderboard]);
 
-  const myRcRank = myProfile
-    ? entries.findIndex(e => e.rc === myProfile.rc) + 1
-    : null;
+  const myRcRank = myProfile ? entries.findIndex(e => e.rc === myProfile.rc) + 1 : null;
+  const topCount = entries[0]?.questCount ?? 0;
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
-        {/* Header */}
-        <View className="px-4 pt-6 pb-2">
-          <Text className="text-white text-2xl font-bold">RC Leaderboard</Text>
-          <Text className="text-muted text-sm mt-1">Week of {weekLabel}</Text>
-        </View>
+    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
+        <ScreenHeader
+          title="RC Leaderboard"
+          subtitle={weekLabel ? `Week of ${weekLabel}` : undefined}
+          rightAction={
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={RefreshCw}
+              iconOnly
+              onPress={fetchLeaderboard}
+            />
+          }
+        />
 
         {/* My RC highlight */}
         {myProfile && myRcRank && myRcRank > 0 && (
-          <View className="mx-4 my-3 bg-accent/10 border border-accent/30 rounded-2xl px-4 py-3 flex-row items-center justify-between">
-            <View>
-              <Text className="text-accent text-xs font-semibold uppercase tracking-wider">Your RC</Text>
-              <Text className="text-white font-bold text-base mt-0.5">{myProfile.rc}</Text>
-            </View>
-            <View className="items-end">
-              <Text className="text-muted text-xs">Current rank</Text>
-              <Text className="text-accent font-bold text-2xl">
-                {myRcRank <= 3 ? MEDAL[myRcRank - 1] : `#${myRcRank}`}
-              </Text>
-            </View>
+          <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+            <Card glow style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View>
+                <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 4 }}>
+                  YOUR COLLEGE
+                </Text>
+                <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 18, letterSpacing: -0.4 }}>
+                  {myProfile.rc}
+                </Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 11, marginBottom: 2 }}>
+                  Rank
+                </Text>
+                <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 28, letterSpacing: -1 }}>
+                  #{myRcRank}
+                </Text>
+              </View>
+            </Card>
           </View>
         )}
 
-        {/* Refresh */}
-        <Pressable onPress={fetchLeaderboard} className="mx-4 mb-2">
-          <Text className="text-accent text-xs text-right">Refresh</Text>
-        </Pressable>
-
-        {/* Leaderboard list */}
+        {/* Leaderboard */}
         {loading ? (
-          <ActivityIndicator color="#60a5fa" style={{ marginTop: 48 }} />
+          <ActivityIndicator color="rgba(255,255,255,0.30)" style={{ marginTop: 60 }} />
         ) : (
-          <View className="px-4 gap-3">
+          <View style={{ paddingHorizontal: 20, gap: 8 }}>
             {entries.map((entry, i) => {
               const isMyRc = myProfile?.rc === entry.rc;
               const tierConfig = entry.topContributor
@@ -151,82 +149,89 @@ export default function LeaderboardScreen() {
                 : null;
 
               return (
-                <View
-                  key={entry.rc}
-                  className={`rounded-2xl p-4 border ${
-                    isMyRc ? 'border-accent/50 bg-accent/5' : 'border-surface-2 bg-surface'
-                  }`}
-                >
-                  <View className="flex-row items-center gap-3">
-                    {/* Rank */}
-                    <View className="w-10 items-center">
-                      {i < 3 ? (
-                        <Text style={{ fontSize: 24 }}>{MEDAL[i]}</Text>
-                      ) : (
-                        <View className="w-8 h-8 rounded-full bg-surface-2 items-center justify-center">
-                          <Text className="text-muted font-bold text-sm">#{i + 1}</Text>
-                        </View>
-                      )}
+                <Card key={entry.rc} glow={isMyRc} variant={isMyRc ? 'elevated' : 'default'}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                    {/* Rank indicator */}
+                    <View
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 11,
+                        backgroundColor: i < 3 ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
+                        borderWidth: 1,
+                        borderColor: i < 3 ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Text style={{
+                        color: i < 3 ? '#ffffff' : 'rgba(255,255,255,0.40)',
+                        fontSize: i < 3 ? 15 : 13,
+                        fontWeight: '700',
+                      }}>
+                        {i === 0 ? '1' : i === 1 ? '2' : i === 2 ? '3' : `${i + 1}`}
+                      </Text>
                     </View>
 
                     {/* RC info */}
-                    <View className="flex-1">
-                      <View className="flex-row items-center gap-2">
-                        <Text className="text-white font-bold text-base">{entry.rc}</Text>
-                        {isMyRc && (
-                          <View className="bg-accent/20 rounded-full px-2 py-0.5">
-                            <Text className="text-accent text-xs font-semibold">You</Text>
-                          </View>
-                        )}
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                        <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 15, letterSpacing: -0.3 }}>
+                          {entry.rc}
+                        </Text>
+                        {isMyRc && <Badge variant="default" value="You" />}
                       </View>
-
                       {entry.topContributor ? (
-                        <View className="flex-row items-center gap-1 mt-0.5">
-                          <Text className="text-muted text-xs">Top: </Text>
-                          <Text className="text-xs font-medium" style={{ color: tierConfig?.colour ?? '#94a3b8' }}>
+                        <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 12 }}>
+                          Top:{' '}
+                          <Text style={{ color: tierConfig?.colour ?? 'rgba(255,255,255,0.60)', fontWeight: '600' }}>
                             {entry.topContributor.display_name}
                           </Text>
-                          <Text className="text-muted text-xs">
-                            · {entry.topContributor.count} quest{entry.topContributor.count !== 1 ? 's' : ''}
-                          </Text>
-                        </View>
+                          {'  ·  ' + entry.topContributor.count + ' quest' + (entry.topContributor.count !== 1 ? 's' : '')}
+                        </Text>
                       ) : (
-                        <Text className="text-muted text-xs mt-0.5">No completions yet</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 12 }}>
+                          No completions yet
+                        </Text>
                       )}
                     </View>
 
-                    {/* Quest count */}
-                    <View className="items-end">
-                      <Text className="text-white font-bold text-xl">{entry.questCount}</Text>
-                      <Text className="text-muted text-xs">quests</Text>
+                    {/* Count */}
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 20, letterSpacing: -0.5 }}>
+                        {entry.questCount}
+                      </Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>quests</Text>
                     </View>
                   </View>
 
-                  {/* Progress bar (relative to top RC) */}
-                  {entries[0].questCount > 0 && (
-                    <View className="mt-3 bg-surface-2 rounded-full h-1.5 overflow-hidden">
-                      <View
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${(entry.questCount / entries[0].questCount) * 100}%`,
-                          backgroundColor: isMyRc ? '#60a5fa' : '#334155',
-                        }}
+                  {/* Progress bar */}
+                  {topCount > 0 && (
+                    <View style={{ marginTop: 14 }}>
+                      <ProgressBar
+                        progress={entry.questCount / topCount}
+                        color={isMyRc ? '#7c3aed' : 'rgba(255,255,255,0.20)'}
+                        height={3}
                       />
                     </View>
                   )}
-                </View>
+                </Card>
               );
             })}
 
             {entries.every(e => e.questCount === 0) && (
-              <View className="py-12 items-center">
-                <Text className="text-muted text-sm">No quests completed this week yet.</Text>
-                <Text className="text-muted text-xs mt-1">Be the first to help your RC climb the ranks!</Text>
+              <View style={{ paddingVertical: 48, alignItems: 'center' }}>
+                <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 15, letterSpacing: -0.2 }}>
+                  No quests completed this week
+                </Text>
+                <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13, marginTop: 4 }}>
+                  Be the first to help your college
+                </Text>
               </View>
             )}
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

@@ -1,36 +1,134 @@
-import { View, Text, Pressable } from 'react-native';
+import { View, Text } from 'react-native';
+import { Component } from 'react';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Button } from '@/components/ui/Button';
+import { DesignSystemScene } from '@/components/three/DesignSystemScene';
+
+class SceneErrorBoundary extends Component<{ children: React.ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() {
+    if (this.state.failed) return null;
+    return this.props.children;
+  }
+}
 
 export default function Welcome() {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View className="flex-1 bg-background items-center justify-center px-6 pb-12">
-      {/* Logo & Tagline */}
-      <View className="mb-12 items-center">
-        <Text className="text-6xl font-black text-white mb-3">Ripple</Text>
-        <Text className="text-muted-light text-lg text-center">
-          Small actions. Big community.
-        </Text>
-        <Text className="text-muted text-sm text-center mt-3 leading-relaxed">
-          Connect with your residential college. Post quests, accept challenges, and build trust one small act at a time.
-        </Text>
-      </View>
+    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+      {/* 3D Background — wrapped in error boundary so a WebGL failure doesn't crash the screen */}
+      <SceneErrorBoundary>
+        <DesignSystemScene />
+      </SceneErrorBoundary>
 
-      {/* Buttons */}
-      <View className="w-full gap-3">
-        <Pressable
-          className="w-full bg-accent rounded-lg py-4 items-center justify-center shadow-md active:shadow-lg active:opacity-90"
-          onPress={() => router.push('/(auth)/sign-up')}
-        >
-          <Text className="text-white font-bold text-base">Get Started</Text>
-        </Pressable>
+      {/* Overlay gradient */}
+      <View
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.75) 100%)',
+        } as any}
+        pointerEvents="none"
+      />
 
-        <Pressable
-          className="w-full border border-accent/30 bg-accent/5 rounded-lg py-4 items-center justify-center active:opacity-80"
-          onPress={() => router.push('/(auth)/sign-in')}
+      {/* Content */}
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingHorizontal: 24,
+          paddingBottom: insets.bottom + 40,
+        }}
+      >
+        {/* Glass card */}
+        <View
+          style={{
+            width: '100%',
+            backgroundColor: 'rgba(0,0,0,0.72)',
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.09)',
+            borderRadius: 28,
+            padding: 32,
+            alignItems: 'center',
+          }}
         >
-          <Text className="text-accent font-bold text-base">Sign In</Text>
-        </Pressable>
+          {/* Wordmark */}
+          <Text
+            style={{
+              color: '#ffffff',
+              fontSize: 42,
+              fontWeight: '800',
+              letterSpacing: -2,
+              marginBottom: 8,
+            }}
+          >
+            Ripple
+          </Text>
+
+          {/* Tagline */}
+          <Text
+            style={{
+              color: 'rgba(255,255,255,0.55)',
+              fontSize: 15,
+              textAlign: 'center',
+              letterSpacing: -0.2,
+              marginBottom: 6,
+            }}
+          >
+            Small actions. Big community.
+          </Text>
+
+          {/* Separator */}
+          <View
+            style={{
+              width: 32,
+              height: 1,
+              backgroundColor: 'rgba(255,255,255,0.12)',
+              marginVertical: 20,
+            }}
+          />
+
+          {/* Description */}
+          <Text
+            style={{
+              color: 'rgba(255,255,255,0.38)',
+              fontSize: 13,
+              textAlign: 'center',
+              lineHeight: 20,
+              letterSpacing: -0.1,
+              marginBottom: 28,
+              paddingHorizontal: 8,
+            }}
+          >
+            Connect with your residential college. Post quests, accept challenges, and build trust.
+          </Text>
+
+          {/* CTA buttons */}
+          <View style={{ width: '100%', gap: 10 }}>
+            <Button
+              variant="primary"
+              size="lg"
+              onPress={() => router.push('/(auth)/sign-up')}
+              style={{ width: '100%' }}
+            >
+              Get Started
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              onPress={() => router.push('/(auth)/sign-in')}
+              style={{ width: '100%' }}
+            >
+              Sign In
+            </Button>
+          </View>
+        </View>
       </View>
     </View>
   );
 }
+

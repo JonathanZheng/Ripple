@@ -1,18 +1,39 @@
-import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { ChevronLeft, Mail, Lock } from 'lucide-react-native';
 
 export default function SignIn() {
-  const [identifier, setIdentifier] = useState(''); // email or display name
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const insets = useSafeAreaInsets();
+
+  const errorY = useSharedValue(-16);
+  const errorOpacity = useSharedValue(0);
+  const errorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: errorY.value }],
+    opacity: errorOpacity.value,
+  }));
+
+  function showError(msg: string) {
+    setError(msg);
+    errorY.value = -16;
+    errorOpacity.value = 0;
+    errorY.value = withSpring(0, { damping: 14, stiffness: 220 });
+    errorOpacity.value = withSpring(1, { damping: 14, stiffness: 220 });
+  }
 
   async function handleSignIn() {
     setError('');
     if (!identifier || !password) {
-      setError('Please enter your email or display name, and your password.');
+      showError('Please enter your email or display name, and your password.');
       return;
     }
 
@@ -20,13 +41,12 @@ export default function SignIn() {
     try {
       let email = identifier.trim();
 
-      // If it doesn't look like an email, look up by display name
       if (!email.includes('@')) {
         const { data, error: rpcError } = await supabase.rpc('get_email_by_display_name', {
           p_display_name: email,
         });
         if (rpcError || !data) {
-          setError('No account found with that display name.');
+          showError('No account found with that display name.');
           return;
         }
         email = data as string;
@@ -34,7 +54,7 @@ export default function SignIn() {
 
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) {
-        setError(signInError.message);
+        showError(signInError.message);
         return;
       }
       router.replace('/(tabs)/feed');
@@ -44,69 +64,98 @@ export default function SignIn() {
   }
 
   return (
-    <View className="flex-1 bg-background px-6 justify-center">
-      {/* Header */}
-      <View className="mb-8">
-        <Text className="text-4xl font-bold text-white mb-2">Welcome back</Text>
-        <Text className="text-muted text-base">Sign in to your Ripple account</Text>
-      </View>
-
-      {/* Error message */}
-      {error && (
-        <View className="bg-danger/15 border border-danger/30 rounded-lg px-4 py-3 mb-6">
-          <Text className="text-danger text-sm font-semibold">{error}</Text>
-        </View>
-      )}
-
-      {/* Email/Display Name Input */}
-      <View className="mb-5">
-        <Text className="text-muted text-sm font-semibold mb-2">Email or Display Name</Text>
-        <TextInput
-          className="bg-surface-2 text-white rounded-lg px-4 py-3.5 border border-surface-3 text-base"
-          placeholder="you@u.nus.edu or Alex Tan"
-          placeholderTextColor="#6b7280"
-          autoCapitalize="none"
-          autoCorrect={false}
-          value={identifier}
-          onChangeText={setIdentifier}
-          editable={!loading}
-        />
-      </View>
-
-      {/* Password Input */}
-      <View className="mb-6">
-        <Text className="text-muted text-sm font-semibold mb-2">Password</Text>
-        <TextInput
-          className="bg-surface-2 text-white rounded-lg px-4 py-3.5 border border-surface-3 text-base"
-          placeholder="••••••••"
-          placeholderTextColor="#6b7280"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-          editable={!loading}
-        />
-      </View>
-
-      {/* Sign In Button */}
-      <Pressable
-        className="bg-accent rounded-lg py-4 items-center justify-center mb-6 shadow-md active:shadow-lg active:opacity-90"
-        onPress={handleSignIn}
-        disabled={loading}
+    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 24,
+          paddingTop: insets.top + 16,
+          paddingBottom: insets.bottom + 40,
+          flexGrow: 1,
+          justifyContent: 'center',
+        }}
+        keyboardShouldPersistTaps="handled"
       >
-        {loading ? (
-          <ActivityIndicator color="#fff" size="small" />
-        ) : (
-          <Text className="text-white font-bold text-base">Sign In</Text>
-        )}
-      </Pressable>
+        {/* Back */}
+        <Pressable
+          onPress={() => router.back()}
+          style={{ marginBottom: 32, alignSelf: 'flex-start', padding: 4, marginLeft: -4 }}
+          hitSlop={12}
+        >
+          <ChevronLeft size={22} color="rgba(255,255,255,0.60)" strokeWidth={2} />
+        </Pressable>
 
-      {/* Sign Up Link */}
-      <Pressable className="items-center" onPress={() => router.push('/(auth)/sign-up')} disabled={loading}>
-        <Text className="text-muted text-sm">
-          Don't have an account?{' '}
-          <Text className="text-accent font-bold">Sign up</Text>
-        </Text>
-      </Pressable>
+        {/* Header */}
+        <View style={{ marginBottom: 36 }}>
+          <Text style={{ color: '#ffffff', fontSize: 30, fontWeight: '700', letterSpacing: -1, marginBottom: 6 }}>
+            Welcome back
+          </Text>
+          <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 15, letterSpacing: -0.2 }}>
+            Sign in to your Ripple account
+          </Text>
+        </View>
+
+        {/* Error */}
+        {error ? (
+          <Animated.View
+            style={[
+              errorStyle,
+              {
+                backgroundColor: 'rgba(239,68,68,0.08)',
+                borderWidth: 1,
+                borderColor: 'rgba(239,68,68,0.30)',
+                borderRadius: 14,
+                padding: 14,
+                marginBottom: 20,
+              },
+            ]}
+          >
+            <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '500' }}>{error}</Text>
+          </Animated.View>
+        ) : null}
+
+        {/* Inputs */}
+        <View style={{ gap: 14, marginBottom: 28 }}>
+          <Input
+            label="Email or display name"
+            leftIcon={Mail}
+            placeholder="you@u.nus.edu"
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            value={identifier}
+            onChangeText={setIdentifier}
+            editable={!loading}
+          />
+          <Input
+            label="Password"
+            leftIcon={Lock}
+            placeholder="••••••••"
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+            editable={!loading}
+          />
+        </View>
+
+        {/* CTA */}
+        <Button
+          variant="primary"
+          size="lg"
+          loading={loading}
+          onPress={handleSignIn}
+          style={{ width: '100%', marginBottom: 20 }}
+        >
+          Sign in
+        </Button>
+
+        {/* Link */}
+        <Pressable onPress={() => router.push('/(auth)/sign-up')} disabled={loading} style={{ alignItems: 'center' }}>
+          <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 14 }}>
+            No account?{' '}
+            <Text style={{ color: '#ffffff', fontWeight: '600' }}>Sign up</Text>
+          </Text>
+        </Pressable>
+      </ScrollView>
     </View>
   );
 }
