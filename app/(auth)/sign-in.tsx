@@ -4,20 +4,34 @@ import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 
 export default function SignIn() {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState(''); // email or display name
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   async function handleSignIn() {
     setError('');
-    if (!email || !password) {
-      setError('Email and password are required.');
+    if (!identifier || !password) {
+      setError('Please enter your email or display name, and your password.');
       return;
     }
 
     setLoading(true);
     try {
+      let email = identifier.trim();
+
+      // If it doesn't look like an email, look up by display name
+      if (!email.includes('@')) {
+        const { data, error: rpcError } = await supabase.rpc('get_email_by_display_name', {
+          p_display_name: email,
+        });
+        if (rpcError || !data) {
+          setError('No account found with that display name.');
+          return;
+        }
+        email = data as string;
+      }
+
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) {
         setError(signInError.message);
@@ -35,15 +49,15 @@ export default function SignIn() {
 
       {error ? <Text className="text-danger mb-4 text-sm">{error}</Text> : null}
 
-      <Text className="text-muted text-sm mb-1">Email</Text>
+      <Text className="text-muted text-sm mb-1">Email or Display Name</Text>
       <TextInput
         className="bg-surface text-white rounded-xl px-4 py-3 mb-4"
-        placeholder="you@u.nus.edu"
+        placeholder="you@u.nus.edu or Alex Tan"
         placeholderTextColor="#6b7280"
         autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
+        autoCorrect={false}
+        value={identifier}
+        onChangeText={setIdentifier}
       />
 
       <Text className="text-muted text-sm mb-1">Password</Text>

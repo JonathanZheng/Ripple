@@ -10,6 +10,7 @@ export default function SignUp() {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [matricNumber, setMatricNumber] = useState('');
   const [rc, setRc] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,6 +28,10 @@ export default function SignUp() {
     }
     if (password.length < 6) {
       setError('Password must be at least 6 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
       return;
     }
 
@@ -86,6 +91,16 @@ export default function SignUp() {
         secureTextEntry
         value={password}
         onChangeText={setPassword}
+      />
+
+      <Text className="text-muted text-sm mb-1">Re-enter Password</Text>
+      <TextInput
+        className="bg-surface text-white rounded-xl px-4 py-3 mb-4"
+        placeholder="••••••••"
+        placeholderTextColor="#6b7280"
+        secureTextEntry
+        value={confirmPassword}
+        onChangeText={setConfirmPassword}
       />
 
       <Text className="text-muted text-sm mb-1">Matric Number</Text>

@@ -100,20 +100,26 @@ Scan the QR code with Expo Go, or press `i` for iOS simulator / `a` for Android 
 ## Project Structure
 
 ```
-app/
-  (auth)/          # Welcome, sign-up, sign-in, verify screens
-  (tabs)/          # Map, feed, post-quest, profile tabs
-  quest/[id].tsx   # Quest detail, chat, completion
-components/        # Shared UI components (QuestCard, etc.)
-constants/         # RC names, tags, colours, trust tier config
-hooks/             # useSession, useProfile
-lib/               # supabase.ts client, geohash helper
-supabase/
-  schema.sql       # Full DB schema — run in Supabase SQL Editor
+app/                       # Routes (expo-router file-based routing)
+  (auth)/                  # Welcome, sign-up, sign-in, verify screens
+  (tabs)/                  # Feed, leaderboard, post-quest, profile tabs
+  quest/[id].tsx           # Quest detail, chat, completion
+assets/                    # Images, fonts, icons
+docs/                      # Documentation
+  PLAN.md                  # 11-stage build plan
+  JON_CHANGES.md           # Changelog
+src/                       # Shared source code
+  components/              # Shared UI components (QuestCard, etc.)
+  constants/               # RC names, tags, colours, trust tier config
+  hooks/                   # useSession, useProfile
+  lib/                     # supabase.ts client, geohash, notifications
+  types/                   # TypeScript types for all DB tables
+  global.css               # Tailwind/NativeWind base styles
+supabase/                  # Backend
+  schema.sql               # Full DB schema — run in Supabase SQL Editor
   functions/
-    process-quest/ # Edge Function: GPT-4o tagging + embeddings
-types/
-  database.ts      # TypeScript types for all DB tables
+    process-quest/         # Edge Function: GPT-4o tagging + embeddings
+    parse-quest/           # Edge Function: NL prompt → structured quest fields
 ```
 
 ---
@@ -141,11 +147,11 @@ The following are excluded by `.gitignore` and must be set up locally:
 | 2 — Auth | ✅ | Sign-up, sign-in, student pass verification |
 | 3 — Quest Creation | ✅ | Multi-step form, AI auto-tagging, flash quests |
 | 4 — Quest Feed | ✅ | Real-time feed, filters, trust-tier gating |
-| 5 — Map View | 🔲 | Mapbox map with clustered quest pins |
-| 6 — Quest Detail & Chat | 🔲 | Acceptance flow, real-time in-app chat |
-| 7 — Completion & Ratings | 🔲 | Drop-off photo, meet-up confirm, trust scores |
-| 8 — Notifications & Profile | 🔲 | Push notifications, full profile screen |
-| 9 — Leaderboard & Gamification | 🔲 | RC rankings, streaks, flash quests |
+| 5 — Map View | ⏭ | Skipped (Mapbox map) |
+| 6 — Quest Detail & Chat | ✅ | Acceptance flow, real-time in-app chat |
+| 7 — Completion & Ratings | ✅ | Drop-off photo, meet-up confirm, trust scores |
+| 8 — Notifications & Profile | ✅ | Push notifications, full profile screen |
+| 9 — Leaderboard & Gamification | ✅ | RC rankings, streaks, flash quests |
 | 10 — Semantic Search | 🔲 | pgvector natural language search |
 | 11 — Polish & Deploy | 🔲 | EAS build, demo data, OTA updates |
 

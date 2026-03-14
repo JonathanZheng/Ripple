@@ -1,4 +1,5 @@
 import { View, Text, Pressable } from 'react-native';
+import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { formatDistanceToNow, isPast } from 'date-fns';
 import { TAG_COLOURS, TRUST_TIER_CONFIG } from '@/constants';
@@ -29,6 +30,22 @@ export function QuestCard({ quest, userTier }: Props) {
   const tagColour = TAG_COLOURS[quest.tag] ?? '#6b7280';
   const tierConfig = TRUST_TIER_CONFIG[userTier];
 
+  // Flash countdown timer
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    if (!quest.is_flash || !quest.flash_expires_at) return;
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, [quest.is_flash, quest.flash_expires_at]);
+
+  const flashExpiresAt = quest.flash_expires_at ? new Date(quest.flash_expires_at) : null;
+  const flashSecondsLeft = flashExpiresAt
+    ? Math.max(0, Math.floor((flashExpiresAt.getTime() - now.getTime()) / 1000))
+    : 0;
+  const flashMins = Math.floor(flashSecondsLeft / 60);
+  const flashSecs = flashSecondsLeft % 60;
+  const flashCountdown = `${flashMins}:${String(flashSecs).padStart(2, '0')}`;
+
   const isFlashExpired =
     quest.is_flash && quest.flash_expires_at && isPast(new Date(quest.flash_expires_at));
 
@@ -40,10 +57,15 @@ export function QuestCard({ quest, userTier }: Props) {
       className="bg-surface rounded-2xl p-4 mb-3 border border-surface-2"
       style={{ opacity: eligibility.ok ? 1 : 0.5 }}
     >
-      {/* Flash badge */}
+      {/* Flash badge with live countdown */}
       {quest.is_flash && (
-        <View className="bg-warning/20 border border-warning rounded-full px-2 py-0.5 self-start mb-2">
-          <Text className="text-warning text-xs font-semibold">Flash Quest</Text>
+        <View className="flex-row items-center gap-2 mb-2">
+          <View className="bg-warning/20 border border-warning rounded-full px-2 py-0.5">
+            <Text className="text-warning text-xs font-semibold">⚡ Flash Quest</Text>
+          </View>
+          <View className="bg-surface-2 rounded-full px-2 py-0.5">
+            <Text className="text-warning text-xs font-mono">{flashCountdown}</Text>
+          </View>
         </View>
       )}
 

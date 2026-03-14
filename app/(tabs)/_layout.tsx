@@ -23,7 +23,7 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontSize: 11 },
       }}
     >
-      <Tabs.Screen name="map" options={{ title: 'Map' }} />
+      <Tabs.Screen name="map" options={{ title: 'Leaderboard' }} />
       <Tabs.Screen name="feed" options={{ title: 'Feed' }} />
       <Tabs.Screen name="post-quest" options={{ title: 'Post' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />

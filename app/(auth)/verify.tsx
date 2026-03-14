@@ -11,7 +11,7 @@ export default function Verify() {
 
   async function pickImage() {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.7,
     });
     if (!result.canceled) {
@@ -38,6 +38,13 @@ export default function Verify() {
         matric_number: string;
         rc: string;
       };
+
+      // Upload student pass photo to storage
+      const ext = imageUri.split('.').pop() ?? 'jpg';
+      const path = `${user.id}.${ext}`;
+      const blob = await (await fetch(imageUri)).blob();
+      await supabase.storage.from('student-passes').upload(path, blob, { upsert: true });
+      // Upload failure is non-fatal — proceed even if bucket doesn't exist yet
 
       // Create profile row — mock verification accepts any photo upload
       const { error: insertError } = await supabase.from('profiles').insert({
