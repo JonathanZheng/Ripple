@@ -6,12 +6,26 @@ export type QuestStatus = 'open' | 'in_progress' | 'completed' | 'expired' | 'di
 export type QuestTag = 'food' | 'transport' | 'social' | 'skills' | 'errands';
 export type FulfilmentMode = 'meetup' | 'dropoff';
 export type StrikeReason = 'non_payment' | 'abandonment';
+export type QuestType = 'standard' | 'social' | 'crew';
+export type MessageType = 'text' | 'image' | 'location';
+export type ReportType = 'inappropriate_content' | 'harassment' | 'dispute' | 'other';
+export type ReportStatus = 'pending' | 'reviewed' | 'resolved' | 'dismissed';
+export type CrewMemberStatus = 'active' | 'dropped_out';
+
+export interface NotificationPreferences {
+  ai_matches?: boolean;
+  quest_accepted?: boolean;
+  quest_completed?: boolean;
+  chat_messages?: boolean;
+  flash_quests?: boolean;
+  frequency?: 'instant' | 'hourly' | 'off';
+}
 
 export interface Profile {
   id: string;
-  matric_number: string;
   display_name: string;
   rc: string;
+  matric_number: string | null;
   skills: string[];
   trust_score: number;
   trust_tier: TrustTier;
@@ -22,6 +36,10 @@ export interface Profile {
   last_active_date: string | null;
   avatar_url: string | null;
   push_token: string | null;
+  completion_rate: number;
+  avg_response_time_mins: number | null;
+  notification_preferences: NotificationPreferences;
+  cross_rc_bonus: number;
   created_at: string;
 }
 
@@ -44,6 +62,9 @@ export interface Quest {
   ai_generated_title: string | null;
   is_flash: boolean;
   flash_expires_at: string | null;
+  quest_type: QuestType;
+  max_acceptors: number;
+  suggested_reward: number | null;
   created_at: string;
 }
 
@@ -69,14 +90,44 @@ export interface Message {
   quest_id: string;
   sender_id: string;
   content: string;
+  type: MessageType;
+  image_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  created_at: string;
+}
+
+export interface Contact {
+  id: string;
+  user_id: string;
+  contact_id: string;
+  created_at: string;
+}
+
+export interface CrewMember {
+  id: string;
+  quest_id: string;
+  user_id: string;
+  joined_at: string;
+  status: CrewMemberStatus;
+}
+
+export interface Report {
+  id: string;
+  reporter_id: string;
+  reported_user_id: string | null;
+  quest_id: string | null;
+  report_type: ReportType;
+  description: string | null;
+  status: ReportStatus;
   created_at: string;
 }
 
 type ProfileInsert = {
   id: string;
-  matric_number: string;
   display_name: string;
   rc: string;
+  matric_number?: string | null;
   skills?: string[];
   trust_score?: number;
   trust_tier?: TrustTier;
@@ -87,6 +138,10 @@ type ProfileInsert = {
   last_active_date?: string | null;
   avatar_url?: string | null;
   push_token?: string | null;
+  completion_rate?: number;
+  avg_response_time_mins?: number | null;
+  notification_preferences?: NotificationPreferences;
+  cross_rc_bonus?: number;
 };
 
 type QuestInsert = {
@@ -104,6 +159,9 @@ type QuestInsert = {
   status?: QuestStatus;
   is_flash?: boolean;
   flash_expires_at?: string | null;
+  quest_type?: QuestType;
+  max_acceptors?: number;
+  suggested_reward?: number | null;
 };
 
 // Supabase Database type wrapper (used by the supabase client generic)
@@ -141,8 +199,40 @@ export type Database = {
       };
       messages: {
         Row: Message;
-        Insert: { quest_id: string; sender_id: string; content: string };
+        Insert: {
+          quest_id: string;
+          sender_id: string;
+          content: string;
+          type?: MessageType;
+          image_url?: string | null;
+          latitude?: number | null;
+          longitude?: number | null;
+        };
         Update: Record<string, never>;
+        Relationships: [];
+      };
+      contacts: {
+        Row: Contact;
+        Insert: { user_id: string; contact_id: string };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      crew_members: {
+        Row: CrewMember;
+        Insert: { quest_id: string; user_id: string; status?: CrewMemberStatus };
+        Update: { status?: CrewMemberStatus };
+        Relationships: [];
+      };
+      reports: {
+        Row: Report;
+        Insert: {
+          reporter_id: string;
+          reported_user_id?: string | null;
+          quest_id?: string | null;
+          report_type: ReportType;
+          description?: string | null;
+        };
+        Update: { status?: ReportStatus };
         Relationships: [];
       };
     };
@@ -151,6 +241,14 @@ export type Database = {
       search_quests: {
         Args: { query_embedding: number[]; match_threshold: number; match_count: number };
         Returns: { id: string; title: string; similarity: number }[];
+      };
+      update_trust_tier: {
+        Args: { user_id: string };
+        Returns: void;
+      };
+      update_trust_score: {
+        Args: { p_user_id: string };
+        Returns: void;
       };
     };
     Enums: Record<string, never>;

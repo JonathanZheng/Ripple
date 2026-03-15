@@ -11,6 +11,10 @@ export const TAG_COLOURS: Record<string, string> = {
   errands:   '#f59e0b',
 };
 
+export const QUEST_TYPES = ['standard', 'social', 'crew'] as const;
+
+export const REPORT_TYPES = ['inappropriate_content', 'harassment', 'dispute', 'other'] as const;
+
 export const TRUST_TIER_CONFIG = {
   wanderer: {
     label: 'Wanderer',
@@ -22,14 +26,14 @@ export const TRUST_TIER_CONFIG = {
     colour: '#60a5fa',
     maxReward: Infinity,
     minQuests: 5,
-    minRating: 4.0,
+    minScore: 7.0,
   },
   champion: {
     label: 'Champion',
     colour: '#fbbf24',
     maxReward: Infinity,
     minQuests: 20,
-    minRating: 4.5,
+    minScore: 8.5,
   },
 } as const;
 
@@ -40,4 +44,8 @@ export const STRIKE_THRESHOLDS = {
 
 export const GRACE_WINDOW_MINUTES = 30;
 
+/** NUS email domain validation — used for hackathon auth gating */
+export const NUS_EMAIL_REGEX = /@u\.nus\.edu$/i;
+
+/** Matric number format — reserved for post-launch Student Pass validation */
 export const MATRIC_REGEX = /^[AaBb]\d{7}[A-Za-z]$/;
