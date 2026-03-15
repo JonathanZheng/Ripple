@@ -11,8 +11,8 @@ A mobile-first peer request platform for NUS UTown residents. Post quests, accep
 - **Frontend:** React Native (Expo SDK 55) + expo-router v5
 - **Styling:** nativewind v4 (Tailwind CSS for RN)
 - **Backend:** Supabase (Auth, PostgreSQL, Realtime, Storage, Edge Functions)
-- **AI:** OpenAI GPT-4o (quest tagging + title generation) + `text-embedding-3-small` (semantic search via pgvector)
-- **Map:** Mapbox (Stage 5+)
+- **AI:** OpenAI GPT-4o (conversational quest creation, piggyback matching, price suggestion) + `text-embedding-3-small` (semantic search via pgvector)
+- **Map:** Mapbox (deferred)
 
 ---
 
@@ -43,7 +43,7 @@ npm install
 1. Create a new project at [supabase.com](https://supabase.com).
 2. Go to **Database → Extensions** and enable the `vector` extension (required for semantic search).
 3. Go to **SQL Editor**, paste the entire contents of `supabase/schema.sql`, and click **Run**. This creates all tables, indexes, RLS policies, and functions.
-4. Go to **Authentication → Providers → Email** and **disable** "Confirm email" — the app uses a custom student pass verification flow instead.
+4. Go to **Authentication → Providers → Email** and **disable** "Confirm email" — the app uses NUS email domain gating (`@u.nus.edu`) instead of email confirmation.
 
 ---
 
@@ -106,7 +106,7 @@ app/                       # Routes (expo-router file-based routing)
   quest/[id].tsx           # Quest detail, chat, completion
 assets/                    # Images, fonts, icons
 docs/                      # Documentation
-  PLAN.md                  # 11-stage build plan
+  PLAN.md                  # 18-stage build plan
   JON_CHANGES.md           # Changelog
 src/                       # Shared source code
   components/              # Shared UI components (QuestCard, etc.)
@@ -120,6 +120,7 @@ supabase/                  # Backend
   functions/
     process-quest/         # Edge Function: GPT-4o tagging + embeddings
     parse-quest/           # Edge Function: NL prompt → structured quest fields
+    chat-quest/            # Edge Function: multi-turn conversational quest creation
 ```
 
 ---
@@ -145,15 +146,21 @@ The following are excluded by `.gitignore` and must be set up locally:
 | 0 — Scaffold | ✅ | Expo app, folder structure, all dependencies |
 | 1 — Supabase Schema | ✅ | DB tables, RLS, pgvector, Edge Function |
 | 2 — Auth | ✅ | Sign-up, sign-in, student pass verification |
-| 3 — Quest Creation | ✅ | Multi-step form, AI auto-tagging, flash quests |
+| 3 — Quest Creation | ✅ | AI chat creation + manual form fallback |
 | 4 — Quest Feed | ✅ | Real-time feed, filters, trust-tier gating |
-| 5 — Map View | ⏭ | Skipped (Mapbox map) |
+| 5 — Map View | ⏭ | Deferred (Mapbox map + Fog of War) |
 | 6 — Quest Detail & Chat | ✅ | Acceptance flow, real-time in-app chat |
 | 7 — Completion & Ratings | ✅ | Drop-off photo, meet-up confirm, trust scores |
 | 8 — Notifications & Profile | ✅ | Push notifications, full profile screen |
 | 9 — Leaderboard & Gamification | ✅ | RC rankings, streaks, flash quests |
-| 10 — Semantic Search | 🔲 | pgvector natural language search |
-| 11 — Polish & Deploy | 🔲 | EAS build, demo data, OTA updates |
+| 10 — Auth Simplification & Schema Evolution | ✅ | NUS email gating, new tables (contacts, crew_members, reports), composite trust score |
+| 11 — Social Quests & Crew Mode | 🔲 | Social (no-payment) quests, crew (multi-acceptor) quests, study groups |
+| 12 — Enhanced Feed Filters | 🔲 | Quest type, reward range, RC, deadline filters |
+| 13 — Enhanced In-App Chat | 🔲 | Photo sharing, location sharing in chat |
+| 14 — Ripple Contacts & Report System | 🔲 | Post-completion social graph, cross-RC bonus, report/dispute system |
+| 15 — AI Price Suggestion & Semantic Search | 🔲 | GPT-4o price suggestions, pgvector natural language search |
+| 16 — AI Piggyback Matching & Notifications | 🔲 | 3-step scoring (geohash + embedding + GPT-4o), configurable notification preferences |
+| 17 — Polish & Deploy | 🔲 | Demo-ready, EAS build, seeded data |
 
 ---
 
