@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ChevronLeft, ShieldCheck, Info } from 'lucide-react-native';
+import { useTheme } from '@/lib/ThemeContext';
 
 /**
  * Verify screen — fallback profile creation.
@@ -20,6 +21,7 @@ import { ChevronLeft, ShieldCheck, Info } from 'lucide-react-native';
  * post-launch.
  */
 export default function Verify() {
+  const { colors } = useTheme();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const insets = useSafeAreaInsets();
@@ -61,7 +63,7 @@ export default function Verify() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000000', paddingHorizontal: 24, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 40, justifyContent: 'center' }}>
+    <View style={{ flex: 1, backgroundColor: colors.background, paddingHorizontal: 24, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 40, justifyContent: 'center' }}>
       {/* Back */}
       <Pressable
         onPress={() => router.back()}

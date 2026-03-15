@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
+import { useTheme } from '@/lib/ThemeContext';
 
 interface ScreenHeaderProps {
   title: string;
@@ -14,6 +15,7 @@ interface ScreenHeaderProps {
 export function ScreenHeader({ title, subtitle, rightAction, backAction }: ScreenHeaderProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { colors } = useTheme();
 
   return (
     <View
@@ -33,12 +35,12 @@ export function ScreenHeader({ title, subtitle, rightAction, backAction }: Scree
             style={{ marginBottom: 8, alignSelf: 'flex-start', padding: 4, marginLeft: -4 }}
             hitSlop={12}
           >
-            <ChevronLeft size={22} color="rgba(255,255,255,0.70)" strokeWidth={2} />
+            <ChevronLeft size={22} color={colors.textMuted} strokeWidth={2} />
           </Pressable>
         )}
         <Text
           style={{
-            color: '#ffffff',
+            color: colors.text,
             fontSize: 24,
             fontWeight: '700',
             letterSpacing: -0.6,
@@ -49,7 +51,7 @@ export function ScreenHeader({ title, subtitle, rightAction, backAction }: Scree
         {subtitle && (
           <Text
             style={{
-              color: 'rgba(255,255,255,0.45)',
+              color: colors.textMuted,
               fontSize: 14,
               marginTop: 2,
               letterSpacing: -0.1,

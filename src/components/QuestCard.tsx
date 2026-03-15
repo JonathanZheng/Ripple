@@ -6,7 +6,8 @@ import { TAG_COLOURS, TRUST_TIER_CONFIG } from '@/constants';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
-import { Zap, Clock, MapPin } from 'lucide-react-native';
+import { useTheme } from '@/lib/ThemeContext';
+import { Zap, Clock, MapPin, Users } from 'lucide-react-native';
 import type { Quest, TrustTier } from '@/types/database';
 
 interface Props {
@@ -59,12 +60,18 @@ export function QuestCard({ quest, userTier }: Props) {
   const deadlineDate = new Date(quest.deadline);
   const expired = isPast(deadlineDate);
   const timeLeft = expired ? 'Expired' : `${formatDistanceToNow(deadlineDate)} left`;
+  const { colors } = useTheme();
 
   const displayTitle = quest.ai_generated_title || quest.title;
   const tierConfig = TRUST_TIER_CONFIG[userTier];
 
   const flashExpiresAt = quest.flash_expires_at;
   const isFlashExpired = quest.is_flash && flashExpiresAt && isPast(new Date(flashExpiresAt));
+
+  const questType = (quest as any).quest_type as string | undefined;
+  const maxAcceptors = (quest as any).max_acceptors as number | undefined;
+  const isSocial = questType === 'social';
+  const isCrew = questType === 'crew';
 
   if (isFlashExpired || expired) return null;
 
@@ -78,14 +85,44 @@ export function QuestCard({ quest, userTier }: Props) {
         <FlashCountdown expiresAt={flashExpiresAt} />
       )}
 
-      {/* Tag + mode + location row */}
+      {/* Tag + mode + quest type + location row */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
         <Badge variant="tag" value={quest.tag} />
         <Badge variant="mode" value={quest.fulfilment_mode} />
+        {isSocial && (
+          <View style={{
+            backgroundColor: 'rgba(217,70,239,0.12)',
+            borderWidth: 1,
+            borderColor: 'rgba(217,70,239,0.30)',
+            borderRadius: 999,
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+          }}>
+            <Text style={{ color: '#d946ef', fontSize: 11, fontWeight: '600' }}>Social</Text>
+          </View>
+        )}
+        {isCrew && (
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            backgroundColor: 'rgba(96,165,250,0.12)',
+            borderWidth: 1,
+            borderColor: 'rgba(96,165,250,0.30)',
+            borderRadius: 999,
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+          }}>
+            <Users size={10} color="#60a5fa" strokeWidth={2} />
+            <Text style={{ color: '#60a5fa', fontSize: 11, fontWeight: '600' }}>
+              Crew ({maxAcceptors ?? 2} slots)
+            </Text>
+          </View>
+        )}
         {quest.location_name && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
-            <MapPin size={11} color="rgba(255,255,255,0.30)" strokeWidth={2} />
-            <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 11 }} numberOfLines={1}>
+            <MapPin size={11} color={colors.textFaint} strokeWidth={2} />
+            <Text style={{ color: colors.textFaint, fontSize: 11 }} numberOfLines={1}>
               {quest.location_name}
             </Text>
           </View>
@@ -94,7 +131,7 @@ export function QuestCard({ quest, userTier }: Props) {
 
       {/* Title */}
       <Text
-        style={{ color: '#ffffff', fontWeight: '700', fontSize: 15, marginBottom: 6, letterSpacing: -0.3, lineHeight: 21 }}
+        style={{ color: colors.text, fontWeight: '700', fontSize: 15, marginBottom: 6, letterSpacing: -0.3, lineHeight: 21 }}
         numberOfLines={2}
       >
         {displayTitle}
@@ -102,7 +139,7 @@ export function QuestCard({ quest, userTier }: Props) {
 
       {/* Description */}
       <Text
-        style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 19, marginBottom: 16 }}
+        style={{ color: colors.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 16 }}
         numberOfLines={2}
       >
         {quest.description}
@@ -110,26 +147,39 @@ export function QuestCard({ quest, userTier }: Props) {
 
       {/* Bottom row */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        {/* Reward */}
-        <View
-          style={{
-            backgroundColor: 'rgba(124,58,237,0.12)',
+        {/* Reward / Social label */}
+        {isSocial ? (
+          <View style={{
+            backgroundColor: 'rgba(217,70,239,0.10)',
             borderWidth: 1,
-            borderColor: 'rgba(124,58,237,0.25)',
+            borderColor: 'rgba(217,70,239,0.20)',
             borderRadius: 10,
             paddingHorizontal: 10,
             paddingVertical: 5,
-          }}
-        >
-          <Text style={{ color: '#a78bfa', fontSize: 14, fontWeight: '700', letterSpacing: -0.3 }}>
-            {quest.reward_amount > 0 ? `$${quest.reward_amount.toFixed(2)}` : 'Favour'}
-          </Text>
-        </View>
+          }}>
+            <Text style={{ color: '#d946ef', fontSize: 13, fontWeight: '700' }}>Social Quest</Text>
+          </View>
+        ) : (
+          <View
+            style={{
+              backgroundColor: 'rgba(124,58,237,0.12)',
+              borderWidth: 1,
+              borderColor: 'rgba(124,58,237,0.25)',
+              borderRadius: 10,
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+            }}
+          >
+            <Text style={{ color: '#a78bfa', fontSize: 14, fontWeight: '700', letterSpacing: -0.3 }}>
+              {quest.reward_amount > 0 ? `$${quest.reward_amount.toFixed(2)}` : 'Favour'}
+            </Text>
+          </View>
+        )}
 
         {/* Deadline */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-          <Clock size={12} color="rgba(255,255,255,0.30)" strokeWidth={2} />
-          <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 12, fontWeight: '500' }}>
+          <Clock size={12} color={colors.textFaint} strokeWidth={2} />
+          <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '500' }}>
             {timeLeft}
           </Text>
         </View>

@@ -7,6 +7,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { LucideIcon } from 'lucide-react-native';
+import { useTheme } from '@/lib/ThemeContext';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -30,15 +31,16 @@ export function Input({
 }: InputProps) {
   const [focused, setFocused] = useState(false);
   const focusAnim = useSharedValue(0);
+  const { colors } = useTheme();
+
+  const borderNormal = error ? 'rgba(239,68,68,0.50)' : colors.inputBorder;
+  const borderFocused = error ? 'rgba(239,68,68,0.70)' : colors.inputBorderFocus;
 
   const animatedBorderStyle = useAnimatedStyle(() => ({
     borderColor: interpolateColor(
       focusAnim.value,
       [0, 1],
-      [
-        error ? 'rgba(239,68,68,0.50)' : 'rgba(255,255,255,0.08)',
-        error ? 'rgba(239,68,68,0.70)' : 'rgba(255,255,255,0.30)',
-      ]
+      [borderNormal, borderFocused]
     ),
   }));
 
@@ -61,7 +63,7 @@ export function Input({
       {label && (
         <Text
           style={{
-            color: 'rgba(255,255,255,0.50)',
+            color: colors.labelColor,
             fontSize: 13,
             fontWeight: '500',
             marginBottom: 7,
@@ -74,7 +76,7 @@ export function Input({
       <Animated.View
         style={[
           {
-            backgroundColor: 'rgba(255,255,255,0.04)',
+            backgroundColor: colors.inputBg,
             borderWidth: 1,
             borderRadius,
             flexDirection: 'row',
@@ -87,17 +89,17 @@ export function Input({
         ]}
       >
         {LeftIcon && (
-          <LeftIcon size={17} color="rgba(255,255,255,0.35)" strokeWidth={2} />
+          <LeftIcon size={17} color={colors.inputIcon} strokeWidth={2} />
         )}
         <TextInput
           {...textInputProps}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          placeholderTextColor="rgba(255,255,255,0.22)"
+          placeholderTextColor={colors.inputPlaceholder}
           style={[
             {
               flex: 1,
-              color: '#ffffff',
+              color: colors.inputText,
               fontSize: 15,
               padding: 0,
               margin: 0,
@@ -106,7 +108,7 @@ export function Input({
           ]}
         />
         {RightIcon && (
-          <RightIcon size={17} color="rgba(255,255,255,0.35)" strokeWidth={2} />
+          <RightIcon size={17} color={colors.inputIcon} strokeWidth={2} />
         )}
       </Animated.View>
       {error && (
@@ -124,7 +126,7 @@ export function Input({
       {hint && !error && (
         <Text
           style={{
-            color: 'rgba(255,255,255,0.35)',
+            color: colors.textFaint,
             fontSize: 12,
             marginTop: 5,
           }}

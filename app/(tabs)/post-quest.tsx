@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { encodeGeohash } from '@/lib/geohash';
 import { QUEST_TAGS, TAG_COLOURS } from '@/constants';
+import { useTheme } from '@/lib/ThemeContext';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -198,9 +199,14 @@ export default function PostQuest() {
   const [locationName, setLocationName] = useState('UTown, NUS');
   const [isFlash, setIsFlash] = useState(false);
 
+  const [questType, setQuestType] = useState<'standard' | 'social' | 'crew'>('standard');
+  const [maxAcceptors, setMaxAcceptors] = useState(2);
+
   const [step, setStep] = useState<Step>('Details');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const { colors } = useTheme();
 
   const stepIndex = STEPS.indexOf(step);
 
@@ -231,7 +237,8 @@ export default function PostQuest() {
   function resetForm() {
     setTitle(''); setDescription(''); setTag(''); setMode('meetup');
     setReward(''); setDeadlineLabel(''); setLocationName('UTown, NUS');
-    setIsFlash(false); setStep('Details'); setError('');
+    setIsFlash(false); setQuestType('standard'); setMaxAcceptors(2);
+    setStep('Details'); setError('');
   }
 
   function resetAiChat() {
@@ -313,12 +320,14 @@ export default function PostQuest() {
           poster_id: user.id,
           title: title.trim(), description: description.trim(),
           tag: (tag || 'errands') as QuestTag, fulfilment_mode: mode,
-          reward_amount: parseFloat(reward) || 0,
+          reward_amount: questType === 'social' ? 0 : (parseFloat(reward) || 0),
           deadline: deadlineDate.toISOString(),
           location_name: locationName || 'UTown, NUS',
           latitude: UTOWN_LAT, longitude: UTOWN_LNG,
           geohash: encodeGeohash(UTOWN_LAT, UTOWN_LNG),
           status: 'open', is_flash: isFlash, flash_expires_at: flashExpiresAt,
+          quest_type: questType,
+          max_acceptors: questType === 'crew' ? maxAcceptors : 1,
         })
         .select('id').single();
       if (insertError || !quest) { setError(insertError?.message ?? 'Failed to create quest.'); return; }
@@ -358,6 +367,7 @@ export default function PostQuest() {
           latitude: UTOWN_LAT, longitude: UTOWN_LNG,
           geohash: encodeGeohash(UTOWN_LAT, UTOWN_LNG),
           status: 'open', is_flash: false, flash_expires_at: null,
+          quest_type: 'standard', max_acceptors: 1,
         })
         .select('id').single();
       if (insertError || !quest) { setError(insertError?.message ?? 'Failed to create quest.'); return; }
@@ -403,7 +413,7 @@ export default function PostQuest() {
 
     return (
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: '#000000' }}
+        style={{ flex: 1, backgroundColor: colors.background }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
@@ -584,7 +594,7 @@ export default function PostQuest() {
   if (step === 'Details') {
     return (
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: '#000000' }}
+        style={{ flex: 1, backgroundColor: colors.background }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScreenHeader title="Post a Quest" />
@@ -626,7 +636,7 @@ export default function PostQuest() {
             style={{ minHeight: 100, textAlignVertical: 'top' }}
           />
 
-          <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginTop: 20, marginBottom: 12 }}>
+          <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginTop: 20, marginBottom: 12 }}>
             CATEGORY (OPTIONAL)
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
@@ -641,7 +651,47 @@ export default function PostQuest() {
             ))}
           </View>
 
-          <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginBottom: 12 }}>
+          <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginBottom: 12 }}>
+            QUEST TYPE
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
+            {(['standard', 'social', 'crew'] as const).map((qt) => (
+              <Chip
+                key={qt}
+                label={qt.charAt(0).toUpperCase() + qt.slice(1)}
+                selected={questType === qt}
+                onPress={() => setQuestType(qt)}
+              />
+            ))}
+          </View>
+
+          {questType === 'social' && (
+            <View style={{ backgroundColor: 'rgba(217,70,239,0.08)', borderWidth: 1, borderColor: 'rgba(217,70,239,0.20)', borderRadius: 12, padding: 12, marginBottom: 16 }}>
+              <Text style={{ color: '#d946ef', fontSize: 13, lineHeight: 19 }}>
+                Social quests are for community activities — no payment involved.
+              </Text>
+            </View>
+          )}
+
+          {questType === 'crew' && (
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginBottom: 10 }}>
+                CREW SIZE
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {[2, 3, 4, 5].map((n) => (
+                  <Chip
+                    key={n}
+                    label={String(n)}
+                    selected={maxAcceptors === n}
+                    onPress={() => setMaxAcceptors(n)}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
+
+          <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginBottom: 12 }}>
             FULFILMENT MODE
           </Text>
           <View style={{ flexDirection: 'row', gap: 12, marginBottom: 28 }}>
@@ -680,7 +730,7 @@ export default function PostQuest() {
   // ─── Manual Mode: Location ─────────────────────────────────────────────────
   if (step === 'Location') {
     return (
-      <View style={{ flex: 1, backgroundColor: '#000000' }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <ScreenHeader title="Post a Quest" />
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 120 }}>
           <View style={{ marginBottom: 20 }}>
@@ -737,7 +787,7 @@ export default function PostQuest() {
   // ─── Manual Mode: Reward & Deadline ───────────────────────────────────────
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#000000' }}
+      style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScreenHeader title="Post a Quest" />

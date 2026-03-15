@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image, Text, View, ViewStyle } from 'react-native';
+import { useTheme } from '@/lib/ThemeContext';
 
 type AvatarSize = 'sm' | 'md' | 'lg';
 
@@ -29,6 +30,7 @@ function getInitials(name: string): string {
 export function Avatar({ name, size = 'md', tierColor, imageUrl, style }: AvatarProps) {
   const cfg = SIZE_CONFIG[size];
   const initials = getInitials(name || '?');
+  const { colors } = useTheme();
 
   return (
     <View
@@ -37,9 +39,9 @@ export function Avatar({ name, size = 'md', tierColor, imageUrl, style }: Avatar
           width: cfg.dim,
           height: cfg.dim,
           borderRadius: cfg.radius,
-          backgroundColor: 'rgba(255,255,255,0.08)',
+          backgroundColor: colors.surface2,
           borderWidth: tierColor ? 1.5 : 1,
-          borderColor: tierColor ? tierColor + '60' : 'rgba(255,255,255,0.10)',
+          borderColor: tierColor ? tierColor + '60' : colors.border,
           overflow: 'hidden',
           alignItems: 'center',
           justifyContent: 'center',
@@ -56,7 +58,7 @@ export function Avatar({ name, size = 'md', tierColor, imageUrl, style }: Avatar
       ) : (
         <Text
           style={{
-            color: tierColor ?? 'rgba(255,255,255,0.80)',
+            color: tierColor ?? colors.textMuted,
             fontSize: cfg.fontSize,
             fontWeight: '700',
             letterSpacing: -0.5,

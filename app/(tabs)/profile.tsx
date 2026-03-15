@@ -15,6 +15,7 @@ import { Chip } from '@/components/ui/Chip';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { X, Plus, Flame, AlertTriangle, Layers } from 'lucide-react-native';
+import { useTheme } from '@/lib/ThemeContext';
 import { Pressable } from 'react-native';
 import type { Profile, Quest } from '@/types/database';
 
@@ -31,6 +32,7 @@ export default function ProfileScreen() {
   const userId = session?.user?.id;
   const insets = useSafeAreaInsets();
 
+  const { colors } = useTheme();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('posted');
@@ -79,7 +81,7 @@ export default function ProfileScreen() {
 
   if (loading && !profile) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color="rgba(255,255,255,0.30)" size="large" />
       </View>
     );
@@ -87,7 +89,7 @@ export default function ProfileScreen() {
 
   if (!profile) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
         <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '600' }}>No profile found.</Text>
       </View>
     );
@@ -100,7 +102,7 @@ export default function ProfileScreen() {
     completedQuests;
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
         <ScreenHeader title="Profile" />
 
@@ -134,7 +136,7 @@ export default function ProfileScreen() {
             <View style={{ flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, overflow: 'hidden' }}>
               {[
                 { label: 'Posted', value: String(postedQuests.length) },
-                { label: 'Completed', value: String(profile.quests_completed ?? 0) },
+                { label: 'Completed', value: String(completedQuests.length) },
                 { label: 'Rating', value: (profile.avg_rating ?? 0).toFixed(1), color: '#f59e0b' },
               ].map((stat, i, arr) => (
                 <View key={stat.label} style={{ flex: 1, alignItems: 'center', paddingVertical: 14, borderRightWidth: i < arr.length - 1 ? 1 : 0, borderRightColor: 'rgba(255,255,255,0.06)' }}>

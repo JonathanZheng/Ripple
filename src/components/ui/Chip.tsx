@@ -6,6 +6,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { Pressable } from 'react-native';
+import { useTheme } from '@/lib/ThemeContext';
 
 interface ChipProps {
   label: string;
@@ -19,6 +20,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function Chip({ label, selected, onPress, color, style }: ChipProps) {
   const scale = useSharedValue(1);
+  const { colors } = useTheme();
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -34,14 +36,14 @@ export function Chip({ label, selected, onPress, color, style }: ChipProps) {
       border = color + '55';
       textColor = color;
     } else {
-      bg = 'rgba(255,255,255,0.90)';
+      bg = colors.chipSelectedBg;
       border = 'transparent';
-      textColor = '#000000';
+      textColor = colors.chipSelectedText;
     }
   } else {
-    bg = 'rgba(255,255,255,0.04)';
-    border = 'rgba(255,255,255,0.10)';
-    textColor = 'rgba(255,255,255,0.55)';
+    bg = colors.chipBg;
+    border = colors.chipBorder;
+    textColor = colors.chipText;
   }
 
   return (

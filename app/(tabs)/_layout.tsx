@@ -1,6 +1,6 @@
 import { Tabs, Redirect } from 'expo-router';
 import { useSession } from '@/hooks/useSession';
-import { View, Text, Pressable, Platform } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
 import Animated, {
@@ -15,13 +15,14 @@ import {
   User,
   Settings,
 } from 'lucide-react-native';
+import { useTheme } from '@/lib/ThemeContext';
 
 const TABS = [
-  { name: 'map',        label: 'Ranks',   icon: Trophy  },
-  { name: 'feed',       label: 'Feed',    icon: Layers  },
-  { name: 'post-quest', label: 'Post',    icon: Plus,   isAction: true },
-  { name: 'profile',    label: 'Profile', icon: User    },
-  { name: 'settings',   label: 'More',    icon: Settings },
+  { name: 'map',        label: 'Ranks',    icon: Trophy  },
+  { name: 'feed',       label: 'Feed',     icon: Layers  },
+  { name: 'post-quest', label: 'Post',     icon: Plus,   isAction: true },
+  { name: 'profile',    label: 'Profile',  icon: User    },
+  { name: 'settings',   label: 'Settings', icon: Settings },
 ];
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -38,6 +39,7 @@ function TabItem({
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const Icon = tab.icon;
+  const { colors } = useTheme();
 
   if (tab.isAction) {
     return (
@@ -81,7 +83,7 @@ function TabItem({
           paddingHorizontal: 10,
           paddingVertical: 8,
           borderRadius: 12,
-          backgroundColor: isActive ? 'rgba(255,255,255,0.10)' : 'transparent',
+          backgroundColor: isActive ? colors.tabActiveBg : 'transparent',
           minWidth: 54,
           gap: 3,
         },
@@ -89,14 +91,14 @@ function TabItem({
     >
       <Icon
         size={18}
-        color={isActive ? '#ffffff' : 'rgba(255,255,255,0.40)'}
+        color={isActive ? colors.tabActive : colors.tabInactive}
         strokeWidth={isActive ? 2.2 : 1.8}
       />
       <Text
         style={{
           fontSize: 10,
           fontWeight: isActive ? '600' : '400',
-          color: isActive ? '#ffffff' : 'rgba(255,255,255,0.40)',
+          color: isActive ? colors.tabActive : colors.tabInactive,
           letterSpacing: 0.2,
         }}
       >
@@ -110,6 +112,7 @@ function FloatingTabBar() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
+  const { colors } = useTheme();
 
   const activeTab = TABS.find(t => pathname.includes(t.name))?.name ?? 'feed';
 
@@ -129,9 +132,9 @@ function FloatingTabBar() {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-around',
-          backgroundColor: 'rgba(10,10,10,0.92)',
+          backgroundColor: colors.tabBar,
           borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.08)',
+          borderColor: colors.tabBarBorder,
           borderRadius: 24,
           paddingHorizontal: 8,
           paddingVertical: 6,
@@ -158,13 +161,14 @@ function FloatingTabBar() {
 
 export default function TabsLayout() {
   const { session, loading } = useSession();
+  const { colors } = useTheme();
 
   if (!loading && !session) {
     return <Redirect href="/(auth)" />;
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Tabs
         screenOptions={{
           headerShown: false,

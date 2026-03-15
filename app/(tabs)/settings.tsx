@@ -1,4 +1,4 @@
-import { View, Text, ScrollView } from 'react-native';
+import { View, Text, ScrollView, Switch } from 'react-native';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,20 +11,23 @@ import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { ChevronRight, Bell, Shield, Lock, HelpCircle, Info } from 'lucide-react-native';
+import { useTheme } from '@/lib/ThemeContext';
+import { ChevronRight, Bell, Shield, Lock, HelpCircle, Info, Sun, Moon } from 'lucide-react-native';
 
 function RowDivider() {
-  return <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.05)' }} />;
+  const { colors } = useTheme();
+  return <View style={{ height: 1, backgroundColor: colors.divider }} />;
 }
 
 function SettingsRow({ icon: Icon, label }: { icon: any; label: string }) {
+  const { colors } = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 }}>
-      <Icon size={17} color="rgba(255,255,255,0.45)" strokeWidth={1.8} />
-      <Text style={{ flex: 1, color: 'rgba(255,255,255,0.80)', fontSize: 15, letterSpacing: -0.2 }}>
+      <Icon size={17} color={colors.textFaint} strokeWidth={1.8} />
+      <Text style={{ flex: 1, color: colors.text, fontSize: 15, letterSpacing: -0.2 }}>
         {label}
       </Text>
-      <ChevronRight size={15} color="rgba(255,255,255,0.20)" strokeWidth={2} />
+      <ChevronRight size={15} color={colors.textFaint} strokeWidth={2} />
     </View>
   );
 }
@@ -34,6 +37,7 @@ export default function Settings() {
   const { session } = useSession();
   const { profile } = useProfile(session?.user.id);
   const [signingOut, setSigningOut] = useState(false);
+  const { colors, isDark, toggleTheme } = useTheme();
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -45,7 +49,7 @@ export default function Settings() {
   const tierConfig = TRUST_TIER_CONFIG[tier];
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
         <ScreenHeader title="Settings" />
 
@@ -58,10 +62,10 @@ export default function Settings() {
               tierColor={tierConfig.colour}
             />
             <View style={{ flex: 1 }}>
-              <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 16, letterSpacing: -0.4, marginBottom: 3 }}>
+              <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16, letterSpacing: -0.4, marginBottom: 3 }}>
                 {profile?.display_name ?? '—'}
               </Text>
-              <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 13, marginBottom: 6 }} numberOfLines={1}>
+              <Text style={{ color: colors.textFaint, fontSize: 13, marginBottom: 6 }} numberOfLines={1}>
                 {session?.user.email ?? '—'}
               </Text>
               <Badge variant="tier" value={tier} color={tierConfig.colour} />
@@ -69,9 +73,33 @@ export default function Settings() {
           </Card>
         </View>
 
+        {/* Appearance section */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
+          <Text style={{ color: colors.sectionLabel, fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 10 }}>
+            APPEARANCE
+          </Text>
+          <Card padding={0}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 }}>
+              {isDark
+                ? <Moon size={17} color={colors.textFaint} strokeWidth={1.8} />
+                : <Sun size={17} color={colors.textFaint} strokeWidth={1.8} />
+              }
+              <Text style={{ flex: 1, color: colors.text, fontSize: 15, letterSpacing: -0.2 }}>
+                {isDark ? 'Dark Mode' : 'Light Mode'}
+              </Text>
+              <Switch
+                value={isDark}
+                onValueChange={toggleTheme}
+                trackColor={{ false: 'rgba(0,0,0,0.15)', true: '#7c3aed' }}
+                thumbColor={isDark ? '#ffffff' : '#f4f3f4'}
+              />
+            </View>
+          </Card>
+        </View>
+
         {/* Account section */}
         <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
-          <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 10 }}>
+          <Text style={{ color: colors.sectionLabel, fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 10 }}>
             ACCOUNT
           </Text>
           <Card padding={0}>
@@ -85,18 +113,18 @@ export default function Settings() {
 
         {/* About section */}
         <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
-          <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 10 }}>
+          <Text style={{ color: colors.sectionLabel, fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 10 }}>
             ABOUT
           </Text>
           <Card padding={0}>
             <SettingsRow icon={HelpCircle} label="Help & Support" />
             <RowDivider />
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 }}>
-              <Info size={17} color="rgba(255,255,255,0.45)" strokeWidth={1.8} />
-              <Text style={{ flex: 1, color: 'rgba(255,255,255,0.80)', fontSize: 15, letterSpacing: -0.2 }}>
+              <Info size={17} color={colors.textFaint} strokeWidth={1.8} />
+              <Text style={{ flex: 1, color: colors.text, fontSize: 15, letterSpacing: -0.2 }}>
                 Version
               </Text>
-              <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 14 }}>1.0.0</Text>
+              <Text style={{ color: colors.textFaint, fontSize: 14 }}>1.0.0</Text>
             </View>
           </Card>
         </View>

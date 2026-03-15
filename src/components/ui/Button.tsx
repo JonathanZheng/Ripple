@@ -1,11 +1,12 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
 import { LucideIcon } from 'lucide-react-native';
+import { useTheme } from '@/lib/ThemeContext';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
@@ -21,29 +22,6 @@ interface ButtonProps {
   iconOnly?: boolean;
   style?: object;
 }
-
-const VARIANT_STYLES: Record<Variant, { bg: string; border: string; text: string }> = {
-  primary: {
-    bg: '#ffffff',
-    border: 'transparent',
-    text: '#000000',
-  },
-  secondary: {
-    bg: 'rgba(255,255,255,0.05)',
-    border: 'rgba(255,255,255,0.15)',
-    text: '#ffffff',
-  },
-  ghost: {
-    bg: 'transparent',
-    border: 'transparent',
-    text: 'rgba(255,255,255,0.60)',
-  },
-  danger: {
-    bg: 'rgba(239,68,68,0.10)',
-    border: 'rgba(239,68,68,0.35)',
-    text: '#ef4444',
-  },
-};
 
 const SIZE_STYLES: Record<Size, { px: number; py: number; fontSize: number; iconSize: number }> = {
   sm: { px: 14, py: 9, fontSize: 13, iconSize: 15 },
@@ -65,10 +43,34 @@ export function Button({
   style,
 }: ButtonProps) {
   const scale = useSharedValue(1);
+  const { colors } = useTheme();
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
+
+  const VARIANT_STYLES: Record<Variant, { bg: string; border: string; text: string }> = {
+    primary: {
+      bg: colors.primaryBg,
+      border: 'transparent',
+      text: colors.primaryText,
+    },
+    secondary: {
+      bg: colors.secondaryBg,
+      border: colors.secondaryBorder,
+      text: colors.secondaryText,
+    },
+    ghost: {
+      bg: 'transparent',
+      border: 'transparent',
+      text: colors.ghostText,
+    },
+    danger: {
+      bg: 'rgba(239,68,68,0.10)',
+      border: 'rgba(239,68,68,0.35)',
+      text: '#ef4444',
+    },
+  };
 
   const v = VARIANT_STYLES[variant];
   const s = SIZE_STYLES[size];

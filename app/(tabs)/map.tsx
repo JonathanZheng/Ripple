@@ -8,6 +8,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { RC_OPTIONS, TRUST_TIER_CONFIG } from '@/constants';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Card } from '@/components/ui/Card';
+import { useTheme } from '@/lib/ThemeContext';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -26,6 +27,7 @@ export default function LeaderboardScreen() {
   const { profile: myProfile } = useProfile(userId);
   const insets = useSafeAreaInsets();
 
+  const { colors } = useTheme();
   const [entries, setEntries] = useState<RCEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [weekLabel, setWeekLabel] = useState('');
@@ -97,7 +99,7 @@ export default function LeaderboardScreen() {
   const topCount = entries[0]?.questCount ?? 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
         <ScreenHeader
           title="RC Leaderboard"

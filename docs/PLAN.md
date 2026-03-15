@@ -44,7 +44,7 @@ What makes Ripple different from a group chat or notice board:
 - **Crew mode** — group quests that need 2+ people. Payment split among crew as agreed. Crew members can come from any RC — a natural inter-RC bonding mechanic.
 - **Ripple Contacts** — after completing a quest together, both parties can add each other as contacts. Contacts see each other's future quests first, building an organic social graph from genuine interactions.
 - **A trust and reputation system** backed by NUS email domain verification, with a composite trust score factoring in completion rate, ratings, response time, and strikes.
-- **Gamification and inter-RC mechanics** (leaderboards, streaks, flash quests, cross-RC reputation bonuses).
+- **Gamification and inter-RC mechanics** (leaderboards, streaks, flash quests).
 - **AI price suggestion** — when a poster doesn't specify a reward, GPT-4o suggests a fair price based on the quest description and historical data.
 
 ---
@@ -111,8 +111,6 @@ What makes Ripple different from a group chat or notice board:
 
 18. **Ripple Contacts.** After every completed quest, both parties see a prompt: "Add [name] as a Ripple contact?" Contacts can see each other's future quests first, making repeat interactions easy.
 
-19. **Cross-RC bonus.** Quests completed with someone from a different RC earn both parties a small reputation bonus, directly incentivising inter-RC connection.
-
 ### Phase G: Reputation Update
 
 20. **Trust Score** — a composite score from completion rate, average rating, response time, and strike count.
@@ -155,7 +153,6 @@ What makes Ripple different from a group chat or notice board:
 - **Skill Profiles** — Declare your skills; Ripple surfaces relevant quests to you.
 - **Quest Streaks** — Complete quests on consecutive days to earn a streak badge.
 - **Ripple Contacts** — Post-completion prompt to add quest partner as a contact. Contacts see each other's future quests first.
-- **Cross-RC Reputation Bonus** — Quests completed with someone from a different RC earn both parties a small reputation bonus.
 
 ### 4d. Trust & Safety
 
@@ -490,7 +487,7 @@ npx expo install expo-notifications
 
 ---
 
-## Stage 10 — Auth Simplification & Schema Evolution 🔲
+## Stage 10 — Auth Simplification & Schema Evolution ✅
 
 **Goal:** Switch student verification to NUS email domain gating; add new DB tables and columns for social quests, crew mode, contacts, reports, notifications preferences, and the updated trust score algorithm.
 
@@ -572,7 +569,7 @@ $$ LANGUAGE plpgsql;
 
 ---
 
-## Stage 11 — Social Quests & Crew Mode 🔲
+## Stage 11 — Social Quests & Crew Mode ✅
 
 **Goal:** Support social (no-payment) quests and crew (multi-acceptor) quests end-to-end.
 
@@ -608,7 +605,7 @@ $$ LANGUAGE plpgsql;
 
 ---
 
-## Stage 12 — Enhanced Feed Filters 🔲
+## Stage 12 — Enhanced Feed Filters ✅
 
 **Goal:** Expand feed filtering to support new quest types and additional filter dimensions.
 
@@ -632,7 +629,7 @@ $$ LANGUAGE plpgsql;
 
 ---
 
-## Stage 13 — Enhanced In-App Chat 🔲
+## Stage 13 — Enhanced In-App Chat ✅
 
 **Goal:** Add photo sharing and location sharing to the in-app chat.
 
@@ -676,7 +673,6 @@ $$ LANGUAGE plpgsql;
   - Dismiss → no action
 - `app/(tabs)/feed.tsx` — contacts' quests appear first in feed (sort boost)
 - `app/(tabs)/profile.tsx` — contacts count displayed; tappable to see contacts list
-- **Cross-RC reputation bonus:** on quest completion, if poster and acceptor are from different RCs, increment a `cross_rc_bonus` counter on both profiles
 
 ### Report System
 - **Report button** on quest detail screen (`app/quest/[id].tsx`) and on other user's profile
@@ -690,6 +686,8 @@ $$ LANGUAGE plpgsql;
 - Contacts' quests rank higher in feed.
 - Can report a quest or user; report row appears in DB.
 - Can raise a dispute on a completed quest.
+
+---
 
 ---
 
@@ -788,11 +786,11 @@ $$ LANGUAGE plpgsql;
 | 7 | Completion & Ratings | End-to-end quest lifecycle, trust scores | ✅ |
 | 8 | Notifications & Profile | Push notifications, full profile screen | ✅ |
 | 9 | Leaderboard & Gamification | RC rankings, streaks, flash countdown | ✅ |
-| 10 | Auth Simplification & Schema Evolution | NUS email gating, new tables (contacts, crew_members, reports), trust score algo | 🔲 |
-| 11 | Social Quests & Crew Mode | Social (no-payment) quests, crew (multi-acceptor) quests, study groups | 🔲 |
-| 12 | Enhanced Feed Filters | Quest type, reward range, RC, deadline filters | 🔲 |
-| 13 | Enhanced In-App Chat | Photo sharing, location sharing in chat | 🔲 |
-| 14 | Ripple Contacts & Report System | Post-completion social graph, cross-RC bonus, report/dispute system | 🔲 |
+| 10 | Auth Simplification & Schema Evolution | NUS email gating, new tables (contacts, crew_members, reports), trust score algo | ✅ |
+| 11 | Social Quests & Crew Mode | Social (no-payment) quests, crew (multi-acceptor) quests, study groups | ✅ |
+| 12 | Enhanced Feed Filters | Quest type, reward range, RC, deadline filters | ✅ |
+| 13 | Enhanced In-App Chat | Photo sharing, location sharing in chat | ✅ |
+| 14 | Ripple Contacts & Report System | Post-completion social graph, report/dispute system | 🔲 |
 | 15 | AI Price Suggestion & Semantic Search | GPT-4o price suggestions, pgvector natural language search | 🔲 |
 | 16 | AI Piggyback Matching & Configurable Notifications | 3-step scoring (geohash + embedding + GPT-4o re-rank), notification preferences | 🔲 |
 | 17 | Polish & Deploy | Demo-ready, EAS build, seeded data | 🔲 |

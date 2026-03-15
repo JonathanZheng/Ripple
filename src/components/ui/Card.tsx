@@ -5,6 +5,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import { useTheme } from '@/lib/ThemeContext';
 
 type CardVariant = 'default' | 'elevated';
 
@@ -28,13 +29,14 @@ export function Card({
   padding = 16,
 }: CardProps) {
   const scale = useSharedValue(1);
+  const { colors } = useTheme();
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  const bg = variant === 'elevated' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)';
-  const border = variant === 'elevated' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)';
+  const bg = variant === 'elevated' ? colors.surface2 : colors.surface;
+  const border = variant === 'elevated' ? colors.borderStrong : colors.border;
 
   const containerStyle: ViewStyle = {
     backgroundColor: bg,

@@ -10,6 +10,7 @@ import { Chip } from '@/components/ui/Chip';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { NUS_EMAIL_REGEX } from '@/constants';
 import { ChevronLeft } from 'lucide-react-native';
+import { useTheme } from '@/lib/ThemeContext';
 
 const RC_OPTIONS = ['Acacia', 'CAPT', 'NUSC', 'RC4', 'RVRC', 'Tembusu', 'UTR'];
 
@@ -22,6 +23,7 @@ export default function SignUp() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   const errorY = useSharedValue(-16);
   const errorOpacity = useSharedValue(0);
@@ -100,7 +102,7 @@ export default function SignUp() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Progress bar */}
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
         <ProgressBar progress={completeness} color="#7c3aed" height={2} />

@@ -154,10 +154,10 @@ The following are excluded by `.gitignore` and must be set up locally:
 | 8 — Notifications & Profile | ✅ | Push notifications, full profile screen |
 | 9 — Leaderboard & Gamification | ✅ | RC rankings, streaks, flash quests |
 | 10 — Auth Simplification & Schema Evolution | ✅ | NUS email gating, new tables (contacts, crew_members, reports), composite trust score |
-| 11 — Social Quests & Crew Mode | 🔲 | Social (no-payment) quests, crew (multi-acceptor) quests, study groups |
-| 12 — Enhanced Feed Filters | 🔲 | Quest type, reward range, RC, deadline filters |
-| 13 — Enhanced In-App Chat | 🔲 | Photo sharing, location sharing in chat |
-| 14 — Ripple Contacts & Report System | 🔲 | Post-completion social graph, cross-RC bonus, report/dispute system |
+| 11 — Social Quests & Crew Mode | ✅ | Social (no-payment) quests, crew (multi-acceptor) quests, study groups |
+| 12 — Enhanced Feed Filters | ✅ | Quest type, reward range, RC, deadline filters |
+| 13 — Enhanced In-App Chat | ✅ | Photo sharing, location sharing in chat |
+| 14 — Ripple Contacts & Report System | 🔲 | Post-completion social graph, report/dispute system |
 | 15 — AI Price Suggestion & Semantic Search | 🔲 | GPT-4o price suggestions, pgvector natural language search |
 | 16 — AI Piggyback Matching & Notifications | 🔲 | 3-step scoring (geohash + embedding + GPT-4o), configurable notification preferences |
 | 17 — Polish & Deploy | 🔲 | Demo-ready, EAS build, seeded data |

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, View, ViewStyle } from 'react-native';
 import { TAG_COLOURS } from '@/constants';
+import { useTheme } from '@/lib/ThemeContext';
 
 type Variant = 'tag' | 'tier' | 'status' | 'mode' | 'default';
 
@@ -34,9 +35,11 @@ const MODE_LABELS: Record<string, string> = {
 };
 
 export function Badge({ variant = 'default', value, color, style }: BadgeProps) {
-  let bg = 'rgba(255,255,255,0.06)';
-  let border = 'rgba(255,255,255,0.10)';
-  let text = 'rgba(255,255,255,0.70)';
+  const { colors } = useTheme();
+
+  let bg = colors.surface2;
+  let border = colors.border;
+  let text = colors.textMuted;
   let label = value;
 
   if (variant === 'tag') {

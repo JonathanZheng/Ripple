@@ -7,6 +7,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-na
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { ChevronLeft, Mail, Lock } from 'lucide-react-native';
+import { useTheme } from '@/lib/ThemeContext';
 
 export default function SignIn() {
   const [identifier, setIdentifier] = useState('');
@@ -14,6 +15,7 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   const errorY = useSharedValue(-16);
   const errorOpacity = useSharedValue(0);
@@ -64,7 +66,7 @@ export default function SignIn() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 24,
