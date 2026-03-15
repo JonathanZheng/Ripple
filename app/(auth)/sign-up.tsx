@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { ProgressBar } from '@/components/ui/ProgressBar';
-import { MATRIC_REGEX } from '@/constants';
+import { NUS_EMAIL_REGEX } from '@/constants';
 import { ChevronLeft } from 'lucide-react-native';
 
 const RC_OPTIONS = ['Acacia', 'CAPT', 'NUSC', 'RC4', 'RVRC', 'Tembusu', 'UTR'];
@@ -18,7 +18,6 @@ export default function SignUp() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [matricNumber, setMatricNumber] = useState('');
   const [rc, setRc] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -32,9 +31,9 @@ export default function SignUp() {
   }));
 
   const completeness = useMemo(() => {
-    const fields = [displayName, email, password, confirmPassword, matricNumber, rc];
+    const fields = [displayName, email, password, confirmPassword, rc];
     return fields.filter(Boolean).length / fields.length;
-  }, [displayName, email, password, confirmPassword, matricNumber, rc]);
+  }, [displayName, email, password, confirmPassword, rc]);
 
   function showError(msg: string) {
     setError(msg);
@@ -46,12 +45,12 @@ export default function SignUp() {
 
   async function handleSignUp() {
     setError('');
-    if (!displayName || !email || !password || !matricNumber || !rc) {
+    if (!displayName || !email || !password || !rc) {
       showError('All fields are required.');
       return;
     }
-    if (!MATRIC_REGEX.test(matricNumber)) {
-      showError('Matric number format is invalid (e.g. A0123456X).');
+    if (!NUS_EMAIL_REGEX.test(email.trim())) {
+      showError('Please use your NUS email (e.g. e0123456@u.nus.edu).');
       return;
     }
     if (password.length < 6) {
@@ -65,11 +64,11 @@ export default function SignUp() {
 
     setLoading(true);
     try {
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
         password,
         options: {
-          data: { display_name: displayName, matric_number: matricNumber, rc },
+          data: { display_name: displayName, rc },
         },
       });
 
@@ -78,7 +77,23 @@ export default function SignUp() {
         return;
       }
 
-      router.push('/(auth)/verify');
+      // Create profile directly — no separate verify step needed
+      const user = signUpData.user;
+      if (user) {
+        const { error: insertError } = await supabase.from('profiles').insert({
+          id: user.id,
+          display_name: displayName,
+          rc,
+        });
+
+        // Ignore duplicate key error (profile already exists)
+        if (insertError && insertError.code !== '23505') {
+          showError(insertError.message);
+          return;
+        }
+      }
+
+      router.replace('/(tabs)/feed');
     } finally {
       setLoading(false);
     }
@@ -114,7 +129,7 @@ export default function SignUp() {
             Create account
           </Text>
           <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 15, letterSpacing: -0.2 }}>
-            Join Ripple and start helping your college
+            Join Ripple with your NUS email
           </Text>
         </View>
 
@@ -140,10 +155,9 @@ export default function SignUp() {
         {/* Inputs */}
         <View style={{ gap: 14, marginBottom: 28 }}>
           <Input label="Display name" placeholder="e.g. Alex Tan" value={displayName} onChangeText={setDisplayName} editable={!loading} />
-          <Input label="NUS email" placeholder="eXXXXXXX@u.nus.edu" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} editable={!loading} />
+          <Input label="NUS email" placeholder="e0123456@u.nus.edu" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} editable={!loading} />
           <Input label="Password" placeholder="at least 6 characters" secureTextEntry value={password} onChangeText={setPassword} editable={!loading} />
           <Input label="Confirm password" placeholder="••••••••" secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} editable={!loading} />
-          <Input label="Matric number" placeholder="A0XXXXXXX" autoCapitalize="characters" value={matricNumber} onChangeText={setMatricNumber} editable={!loading} />
         </View>
 
         {/* RC Selection */}
