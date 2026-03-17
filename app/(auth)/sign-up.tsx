@@ -79,23 +79,8 @@ export default function SignUp() {
         return;
       }
 
-      // Create profile directly — no separate verify step needed
-      const user = signUpData.user;
-      if (user) {
-        const { error: insertError } = await supabase.from('profiles').insert({
-          id: user.id,
-          display_name: displayName,
-          rc,
-        });
-
-        // Ignore duplicate key error (profile already exists)
-        if (insertError && insertError.code !== '23505') {
-          showError(insertError.message);
-          return;
-        }
-      }
-
-      router.replace('/(tabs)/feed');
+      // Navigate to OTP verification screen
+      router.push(`/(auth)/verify?email=${encodeURIComponent(email.trim())}`);
     } finally {
       setLoading(false);
     }

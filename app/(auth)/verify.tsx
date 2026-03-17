@@ -1,47 +1,78 @@
-import { View, Text, Pressable } from 'react-native';
-import { useState } from 'react';
-import { router } from 'expo-router';
+import { View, Text, TextInput, Pressable } from 'react-native';
+import { useState, useRef } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { ChevronLeft, ShieldCheck, Info } from 'lucide-react-native';
+import { ChevronLeft, Mail } from 'lucide-react-native';
 import { useTheme } from '@/lib/ThemeContext';
 
-/**
- * Verify screen — fallback profile creation.
- *
- * In the normal flow, sign-up.tsx creates the profile directly and routes
- * to the feed. This screen handles the edge case where a user has an auth
- * account but no profile row (e.g., interrupted sign-up, or a user who
- * signed up before the auth simplification).
- *
- * Student Pass photo upload has been removed — hackathon auth is gated by
- * NUS email domain (@u.nus.edu). Student Pass scanning is deferred to
- * post-launch.
- */
+const OTP_LENGTH = 6;
+
 export default function Verify() {
   const { colors } = useTheme();
+  const { email } = useLocalSearchParams<{ email: string }>();
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [error, setError] = useState('');
+  const [resent, setResent] = useState(false);
   const insets = useSafeAreaInsets();
+  const inputs = useRef<(TextInput | null)[]>([]);
 
-  async function handleContinue() {
+  function handleChange(text: string, index: number) {
+    const digit = text.replace(/[^0-9]/g, '').slice(-1);
+    const next = [...otp];
+    next[index] = digit;
+    setOtp(next);
+    setError('');
+    if (digit && index < OTP_LENGTH - 1) {
+      inputs.current[index + 1]?.focus();
+    }
+  }
+
+  function handleKeyPress(key: string, index: number) {
+    if (key === 'Backspace' && !otp[index] && index > 0) {
+      const next = [...otp];
+      next[index - 1] = '';
+      setOtp(next);
+      inputs.current[index - 1]?.focus();
+    }
+  }
+
+  async function handleVerify() {
+    const token = otp.join('');
+    if (token.length < OTP_LENGTH) {
+      setError('Please enter the full 6-digit code.');
+      return;
+    }
+    if (!email) {
+      setError('Email missing. Please go back and sign up again.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setError('Session expired. Please sign up again.');
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'signup',
+      });
+
+      if (verifyError) {
+        setError(verifyError.message);
         return;
       }
 
-      const meta = user.user_metadata as {
-        display_name?: string;
-        rc?: string;
-      };
+      const user = data.user;
+      if (!user) {
+        setError('Verification failed. Please try again.');
+        return;
+      }
 
-      const displayName = meta.display_name || user.email?.split('@')[0] || 'User';
+      // Create profile using metadata stored during sign-up
+      const meta = user.user_metadata as { display_name?: string; rc?: string };
+      const displayName = meta.display_name || email.split('@')[0];
       const rc = meta.rc || 'Tembusu';
 
       const { error: insertError } = await supabase.from('profiles').insert({
@@ -50,7 +81,7 @@ export default function Verify() {
         rc,
       });
 
-      // Ignore duplicate key error (profile already exists)
+      // Ignore duplicate key — profile may already exist
       if (insertError && insertError.code !== '23505') {
         setError(insertError.message);
         return;
@@ -62,25 +93,71 @@ export default function Verify() {
     }
   }
 
+  async function handleResend() {
+    if (!email) return;
+    setResending(true);
+    setError('');
+    await supabase.auth.resend({ type: 'signup', email });
+    setResending(false);
+    setResent(true);
+    setTimeout(() => setResent(false), 4000);
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, paddingHorizontal: 24, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 40, justifyContent: 'center' }}>
       {/* Back */}
       <Pressable
         onPress={() => router.back()}
-        style={{ marginBottom: 32, alignSelf: 'flex-start', padding: 4, marginLeft: -4 }}
+        style={{ position: 'absolute', top: insets.top + 16, left: 24, padding: 4 }}
         hitSlop={12}
       >
-        <ChevronLeft size={22} color="rgba(255,255,255,0.60)" strokeWidth={2} />
+        <ChevronLeft size={22} color={colors.textMuted} strokeWidth={2} />
       </Pressable>
 
+      {/* Icon */}
+      <View style={{ alignItems: 'center', marginBottom: 28 }}>
+        <View style={{ backgroundColor: 'rgba(124,58,237,0.12)', borderRadius: 20, padding: 20 }}>
+          <Mail size={40} color="#7c3aed" strokeWidth={1.5} />
+        </View>
+      </View>
+
       {/* Header */}
-      <View style={{ marginBottom: 32 }}>
-        <Text style={{ color: '#ffffff', fontSize: 28, fontWeight: '700', letterSpacing: -0.8, marginBottom: 8 }}>
-          Almost there
+      <View style={{ marginBottom: 32, alignItems: 'center' }}>
+        <Text style={{ color: colors.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.8, marginBottom: 8 }}>
+          Check your email
         </Text>
-        <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 15, lineHeight: 22 }}>
-          Your NUS email has been verified. Tap below to finish setting up your profile and start using Ripple.
+        <Text style={{ color: colors.textMuted, fontSize: 15, lineHeight: 22, textAlign: 'center' }}>
+          We sent a 6-digit code to{'\n'}
+          <Text style={{ color: colors.text, fontWeight: '600' }}>{email}</Text>
         </Text>
+      </View>
+
+      {/* OTP boxes */}
+      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 28 }}>
+        {otp.map((digit, i) => (
+          <TextInput
+            key={i}
+            ref={el => { inputs.current[i] = el; }}
+            value={digit}
+            onChangeText={text => handleChange(text, i)}
+            onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, i)}
+            keyboardType="number-pad"
+            maxLength={1}
+            selectTextOnFocus
+            style={{
+              width: 46,
+              height: 56,
+              borderRadius: 14,
+              borderWidth: 1.5,
+              borderColor: digit ? '#7c3aed' : colors.border,
+              backgroundColor: colors.surface,
+              color: colors.text,
+              fontSize: 22,
+              fontWeight: '700',
+              textAlign: 'center',
+            }}
+          />
+        ))}
       </View>
 
       {/* Error */}
@@ -90,34 +167,24 @@ export default function Verify() {
         </View>
       ) : null}
 
-      {/* Verified badge */}
-      <View style={{ alignItems: 'center', marginBottom: 24 }}>
-        <View style={{ backgroundColor: 'rgba(16,185,129,0.10)', borderRadius: 20, padding: 20 }}>
-          <ShieldCheck size={48} color="#10b981" strokeWidth={1.5} />
-        </View>
-        <Text style={{ color: '#10b981', fontSize: 16, fontWeight: '600', marginTop: 16 }}>
-          NUS Student Verified
-        </Text>
-      </View>
-
-      {/* Info callout */}
-      <Card style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 28, padding: 14 }}>
-        <Info size={16} color="rgba(255,255,255,0.40)" strokeWidth={2} style={{ marginTop: 1 }} />
-        <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 13, flex: 1, lineHeight: 19 }}>
-          Your account is tied to your NUS email. This ensures every Ripple user is a verified student.
-        </Text>
-      </Card>
-
-      {/* CTA */}
+      {/* Verify button */}
       <Button
         variant="primary"
         size="lg"
         loading={loading}
-        onPress={handleContinue}
-        style={{ width: '100%' }}
+        onPress={handleVerify}
+        style={{ width: '100%', marginBottom: 16 }}
       >
-        Get started
+        Verify email
       </Button>
+
+      {/* Resend */}
+      <Pressable onPress={handleResend} disabled={resending} style={{ alignItems: 'center', paddingVertical: 8 }}>
+        <Text style={{ color: colors.textMuted, fontSize: 14 }}>
+          {resent ? '✓ Code resent!' : resending ? 'Resending...' : "Didn't receive it? "}
+          {!resent && !resending && <Text style={{ color: colors.text, fontWeight: '600' }}>Resend code</Text>}
+        </Text>
+      </Pressable>
     </View>
   );
 }
