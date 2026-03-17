@@ -18,6 +18,7 @@ import Animated, {
   withSequence,
   withTiming,
   interpolate,
+  Easing,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -117,16 +118,30 @@ function TypingDots() {
   );
 }
 
-// ─── Mode Toggle (Reanimated sliding pill) ───────────────────────────────────
+// ─── Mode Toggle ─────────────────────────────────────────────────────────────
+const TOGGLE_ANIM = { duration: 220, easing: Easing.out(Easing.cubic) };
+const PILL_W = 96;
+
+function ToggleLabel({ label, isActive }: { label: string; isActive: boolean }) {
+  const style = useAnimatedStyle(() => ({
+    color: withTiming(isActive ? '#000000' : 'rgba(255,255,255,0.50)', TOGGLE_ANIM),
+  }));
+  return (
+    <Animated.Text style={[{ fontSize: 13, fontWeight: '600' }, style]}>
+      {label}
+    </Animated.Text>
+  );
+}
+
 function ModeToggle({ value, onChange }: { value: 'ai' | 'manual'; onChange: (m: 'ai' | 'manual') => void }) {
-  const slideX = useSharedValue(value === 'ai' ? 0 : 1);
+  const progress = useSharedValue(value === 'ai' ? 0 : 1);
 
   useEffect(() => {
-    slideX.value = withSpring(value === 'ai' ? 0 : 1, { damping: 20, stiffness: 200 });
+    progress.value = withTiming(value === 'ai' ? 0 : 1, TOGGLE_ANIM);
   }, [value]);
 
   const pillStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: interpolate(slideX.value, [0, 1], [0, 96]) }],
+    transform: [{ translateX: interpolate(progress.value, [0, 1], [0, PILL_W]) }],
   }));
 
   return (
@@ -139,15 +154,12 @@ function ModeToggle({ value, onChange }: { value: 'ai' | 'manual'; onChange: (m:
       borderColor: 'rgba(255,255,255,0.10)',
       alignSelf: 'flex-start',
       position: 'relative',
-      width: 200,
+      width: PILL_W * 2 + 8,
     }}>
-      {/* Sliding pill */}
       <Animated.View style={[{
         position: 'absolute',
-        top: 4,
-        left: 4,
-        width: 96,
-        bottom: 4,
+        top: 4, left: 4, bottom: 4,
+        width: PILL_W,
         backgroundColor: '#ffffff',
         borderRadius: 999,
       }, pillStyle]} />
@@ -155,15 +167,9 @@ function ModeToggle({ value, onChange }: { value: 'ai' | 'manual'; onChange: (m:
         <Pressable
           key={m}
           onPress={() => onChange(m)}
-          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, zIndex: 1 }}
+          style={{ width: PILL_W, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, zIndex: 1 }}
         >
-          <Text style={{
-            fontSize: 13,
-            fontWeight: '600',
-            color: value === m ? '#000000' : 'rgba(255,255,255,0.50)',
-          }}>
-            {m === 'ai' ? 'AI' : 'Manual'}
-          </Text>
+          <ToggleLabel label={m === 'ai' ? 'AI' : 'Manual'} isActive={value === m} />
         </Pressable>
       ))}
     </View>
@@ -436,25 +442,26 @@ export default function PostQuest() {
 
   function back() { setError(''); const p = stepIndex - 1; if (p >= 0) setStep(STEPS[p]); }
 
-  // ─── AI Mode ───────────────────────────────────────────────────────────────
-  if (postMode === 'ai') {
-    const f = collectedFields;
-    const rewardText = typeof f.reward_amount === 'number' && f.reward_amount > 0
-      ? `$${f.reward_amount.toFixed(2)}`
-      : 'Favour';
+  const f = collectedFields;
+  const rewardText = typeof f.reward_amount === 'number' && f.reward_amount > 0
+    ? `$${f.reward_amount.toFixed(2)}`
+    : 'Favour';
 
-    return (
-      <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: colors.background }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        <ScreenHeader title="Post a Quest" />
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' && postMode === 'ai' ? 90 : 0}
+    >
+      <ScreenHeader title="Post a Quest" />
 
-        {/* Mode Toggle */}
-        <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
-          <ModeToggle value={postMode} onChange={handleModeSwitch} />
-        </View>
+      {/* Mode Toggle — stable position, never remounts */}
+      <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
+        <ModeToggle value={postMode} onChange={handleModeSwitch} />
+      </View>
+
+      {/* ── AI Mode ── */}
+      {postMode === 'ai' && (<>
 
         {/* Chat area */}
         <ScrollView
@@ -618,23 +625,14 @@ export default function PostQuest() {
             />
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
-    );
-  }
+      </>)}
 
-  // ─── Manual Mode: Details ──────────────────────────────────────────────────
-  if (step === 'Details') {
-    return (
-      <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: colors.background }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScreenHeader title="Post a Quest" />
+      {/* ── Manual Mode ── */}
+      {postMode === 'manual' && (
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 120 }}>
-          <View style={{ marginBottom: 20 }}>
-            <ModeToggle value={postMode} onChange={handleModeSwitch} />
-          </View>
 
+          {/* Steps: Details */}
+          {step === 'Details' && (<>
           <StepIndicator steps={[...STEPS]} currentIndex={stepIndex} />
 
           <Text style={{ color: '#ffffff', fontSize: 22, fontWeight: '700', letterSpacing: -0.5, marginTop: 20, marginBottom: 4 }}>
@@ -754,21 +752,10 @@ export default function PostQuest() {
           <Button variant="primary" size="lg" onPress={next} style={{ width: '100%' }}>
             Next
           </Button>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    );
-  }
+          </>)}
 
-  // ─── Manual Mode: Location ─────────────────────────────────────────────────
-  if (step === 'Location') {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <ScreenHeader title="Post a Quest" />
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 120 }}>
-          <View style={{ marginBottom: 20 }}>
-            <ModeToggle value={postMode} onChange={handleModeSwitch} />
-          </View>
-
+          {/* Steps: Location */}
+          {step === 'Location' && (<>
           <StepIndicator steps={[...STEPS]} currentIndex={stepIndex} />
 
           <Text style={{ color: '#ffffff', fontSize: 22, fontWeight: '700', letterSpacing: -0.5, marginTop: 20, marginBottom: 4 }}>
@@ -843,24 +830,11 @@ export default function PostQuest() {
               Next
             </Button>
           </View>
-        </ScrollView>
-      </View>
-    );
-  }
+          </>)}
 
-  // ─── Manual Mode: Reward & Deadline ───────────────────────────────────────
-  return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScreenHeader title="Post a Quest" />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 120 }}>
-        <View style={{ marginBottom: 20 }}>
-          <ModeToggle value={postMode} onChange={handleModeSwitch} />
-        </View>
-
-        <StepIndicator steps={[...STEPS]} currentIndex={stepIndex} />
+          {/* Steps: Reward & Deadline */}
+          {step === 'Reward' && (<>
+          <StepIndicator steps={[...STEPS]} currentIndex={stepIndex} />
 
         <Text style={{ color: '#ffffff', fontSize: 22, fontWeight: '700', letterSpacing: -0.5, marginTop: 20, marginBottom: 4 }}>
           Reward & Deadline
@@ -938,7 +912,11 @@ export default function PostQuest() {
             Post Quest
           </Button>
         </View>
-      </ScrollView>
+          </>)}
+
+        </ScrollView>
+      )}
+
     </KeyboardAvoidingView>
   );
 }

@@ -1,5 +1,6 @@
-import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
-import { useState, useCallback } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, LayoutChangeEvent } from 'react-native';
+import { useState, useCallback, useRef } from 'react';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,6 +37,19 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('posted');
+  const [tabBarWidth, setTabBarWidth] = useState(0);
+  const tabPill = useSharedValue(0);
+  const SLIDE = { duration: 220, easing: Easing.out(Easing.cubic) };
+
+  function switchTab(tab: Tab) {
+    const idx = TABS.findIndex((t) => t.value === tab);
+    tabPill.value = withTiming(idx, SLIDE);
+    setActiveTab(tab);
+  }
+
+  const pillAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: tabPill.value * (tabBarWidth / TABS.length) }],
+  }));
   const [postedQuests, setPostedQuests] = useState<Quest[]>([]);
   const [inProgressQuests, setInProgressQuests] = useState<Quest[]>([]);
   const [completedQuests, setCompletedQuests] = useState<Quest[]>([]);
@@ -238,27 +252,52 @@ export default function ProfileScreen() {
           </Text>
 
           {/* Tab selector */}
-          <View style={{ flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 4, gap: 4, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' }}>
-            {TABS.map(({ value, label }) => (
-              <View
-                key={value}
-                style={{ flex: 1, borderRadius: 10, backgroundColor: activeTab === value ? '#ffffff' : 'transparent', overflow: 'hidden' }}
-              >
-                <Chip
-                  label={label}
-                  selected={activeTab === value}
-                  onPress={() => setActiveTab(value)}
-                  style={{
-                    width: '100%',
-                    alignItems: 'center',
-                    paddingHorizontal: 4,
+          <View
+            onLayout={(e: LayoutChangeEvent) => setTabBarWidth(e.nativeEvent.layout.width)}
+            style={{
+              flexDirection: 'row',
+              backgroundColor: 'rgba(255,255,255,0.04)',
+              borderRadius: 14,
+              padding: 4,
+              marginBottom: 16,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.07)',
+              position: 'relative',
+            }}
+          >
+            {/* Sliding pill */}
+            {tabBarWidth > 0 && (
+              <Animated.View
+                style={[
+                  {
+                    position: 'absolute',
+                    top: 4, bottom: 4, left: 4,
+                    width: (tabBarWidth - 8) / TABS.length,
+                    backgroundColor: '#ffffff',
                     borderRadius: 10,
-                    borderWidth: 0,
-                    backgroundColor: 'transparent',
-                  }}
-                />
-              </View>
-            ))}
+                  },
+                  pillAnimStyle,
+                ]}
+              />
+            )}
+            {TABS.map(({ value, label }) => {
+              const isActive = activeTab === value;
+              return (
+                <Pressable
+                  key={value}
+                  onPress={() => switchTab(value)}
+                  style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, zIndex: 1 }}
+                >
+                  <Text style={{
+                    fontSize: 13,
+                    fontWeight: '600',
+                    color: isActive ? '#000000' : 'rgba(255,255,255,0.45)',
+                  }}>
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           {loading ? (
