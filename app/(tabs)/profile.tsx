@@ -101,6 +101,21 @@ export default function ProfileScreen() {
     activeTab === 'inprogress' ? inProgressQuests :
     completedQuests;
 
+  function effectiveStatus(quest: Quest): string {
+    if (
+      quest.status === 'open' &&
+      quest.deadline &&
+      new Date(quest.deadline) <= new Date()
+    ) return 'expired';
+    if (
+      quest.status === 'open' &&
+      quest.is_flash &&
+      quest.flash_expires_at &&
+      new Date(quest.flash_expires_at) <= new Date()
+    ) return 'expired';
+    return quest.status;
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
@@ -269,7 +284,7 @@ export default function ProfileScreen() {
                       {quest.ai_generated_title ?? quest.title}
                     </Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Badge variant="status" value={quest.status} />
+                      <Badge variant="status" value={effectiveStatus(quest)} />
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                         <Text style={{ color: '#a78bfa', fontWeight: '700', fontSize: 13 }}>
                           {quest.reward_amount > 0 ? `$${quest.reward_amount.toFixed(2)}` : 'Favour'}

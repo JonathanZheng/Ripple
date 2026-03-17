@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -31,7 +31,7 @@ import { Input } from '@/components/ui/Input';
 import { Chip } from '@/components/ui/Chip';
 import { Badge } from '@/components/ui/Badge';
 import { StepIndicator } from '@/components/ui/StepIndicator';
-import { Users, Package, Send, Zap } from 'lucide-react-native';
+import { Users, Package, Send, Zap, MapPin } from 'lucide-react-native';
 import type { QuestTag, FulfilmentMode } from '@/types/database';
 
 // NUS UTown rough centre
@@ -173,6 +173,7 @@ function ModeToggle({ value, onChange }: { value: 'ai' | 'manual'; onChange: (m:
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function PostQuest() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ lat?: string; lon?: string }>();
   const [postMode, setPostMode] = useState<'ai' | 'manual'>('ai');
 
   // ── AI chat state ──────────────────────────────────────────────────────────
@@ -191,11 +192,20 @@ export default function PostQuest() {
   const scrollRef = useRef<ScrollView>(null);
   const shouldReset = useRef(false);
 
+  // Pick up lat/lon when returning from map picker
+  useFocusEffect(useCallback(() => {
+    if (params.lat && params.lon) {
+      setPickedLat(parseFloat(params.lat));
+      setPickedLon(parseFloat(params.lon));
+    }
+  }, [params.lat, params.lon]));
+
   useFocusEffect(useCallback(() => {
     if (!shouldReset.current) return;
     shouldReset.current = false;
     setTitle(''); setDescription(''); setTag(''); setMode('meetup');
     setReward(''); setDeadlineLabel(''); setLocationName('UTown, NUS');
+    setPickedLat(null); setPickedLon(null);
     setIsFlash(false); setQuestType('standard'); setMaxAcceptors(2);
     setStep('Details'); setError('');
     setChatMessages([{ id: nextId(), role: 'assistant', content: GREETING }]);
@@ -212,6 +222,12 @@ export default function PostQuest() {
   const [reward, setReward] = useState('');
   const [deadlineLabel, setDeadlineLabel] = useState<DeadlineLabel | ''>('');
   const [locationName, setLocationName] = useState('UTown, NUS');
+  const [pickedLat, setPickedLat] = useState<number | null>(
+    params.lat ? parseFloat(params.lat) : null,
+  );
+  const [pickedLon, setPickedLon] = useState<number | null>(
+    params.lon ? parseFloat(params.lon) : null,
+  );
   const [isFlash, setIsFlash] = useState(false);
 
   const [questType, setQuestType] = useState<'standard' | 'social' | 'crew'>('standard');
@@ -252,6 +268,7 @@ export default function PostQuest() {
   function resetForm() {
     setTitle(''); setDescription(''); setTag(''); setMode('meetup');
     setReward(''); setDeadlineLabel(''); setLocationName('UTown, NUS');
+    setPickedLat(null); setPickedLon(null);
     setIsFlash(false); setQuestType('standard'); setMaxAcceptors(2);
     setStep('Details'); setError('');
   }
@@ -338,8 +355,8 @@ export default function PostQuest() {
           reward_amount: questType === 'social' ? 0 : (parseFloat(reward) || 0),
           deadline: deadlineDate.toISOString(),
           location_name: locationName || 'UTown, NUS',
-          latitude: UTOWN_LAT, longitude: UTOWN_LNG,
-          geohash: encodeGeohash(UTOWN_LAT, UTOWN_LNG),
+          latitude: pickedLat ?? UTOWN_LAT, longitude: pickedLon ?? UTOWN_LNG,
+          geohash: encodeGeohash(pickedLat ?? UTOWN_LAT, pickedLon ?? UTOWN_LNG),
           status: 'open', is_flash: isFlash, flash_expires_at: flashExpiresAt,
           quest_type: questType,
           max_acceptors: questType === 'crew' ? maxAcceptors : 1,
@@ -379,8 +396,8 @@ export default function PostQuest() {
           reward_amount: fields.reward_amount,
           deadline: deadlineDate.toISOString(),
           location_name: fields.location_name || 'UTown, NUS',
-          latitude: UTOWN_LAT, longitude: UTOWN_LNG,
-          geohash: encodeGeohash(UTOWN_LAT, UTOWN_LNG),
+          latitude: pickedLat ?? UTOWN_LAT, longitude: pickedLon ?? UTOWN_LNG,
+          geohash: encodeGeohash(pickedLat ?? UTOWN_LAT, pickedLon ?? UTOWN_LNG),
           status: 'open', is_flash: false, flash_expires_at: null,
           quest_type: 'standard', max_acceptors: 1,
         })
@@ -771,6 +788,38 @@ export default function PostQuest() {
             value={locationName}
             onChangeText={setLocationName}
           />
+
+          {/* Picked coordinates indicator */}
+          {pickedLat && pickedLon && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
+              <MapPin size={14} color="#10b981" />
+              <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '600' }}>
+                Pin set: {pickedLat.toFixed(5)}, {pickedLon.toFixed(5)}
+              </Text>
+            </View>
+          )}
+
+          {/* Pick on Map button */}
+          <Pressable
+            onPress={() => router.push('/(tabs)/map?mode=pick')}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              marginTop: 16,
+              paddingVertical: 14,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: 'rgba(124,58,237,0.5)',
+              backgroundColor: pressed ? 'rgba(124,58,237,0.15)' : 'rgba(124,58,237,0.08)',
+            })}
+          >
+            <MapPin size={18} color="#a78bfa" />
+            <Text style={{ color: '#a78bfa', fontWeight: '700', fontSize: 15 }}>
+              Pick on Map
+            </Text>
+          </Pressable>
 
           <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginTop: 20, marginBottom: 12 }}>
             QUICK SELECT
