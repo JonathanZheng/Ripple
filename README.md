@@ -54,30 +54,46 @@ Create a `.env` file in the project root (this file is gitignored — never comm
 ```
 EXPO_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
-EXPO_PUBLIC_MAPBOX_TOKEN=          # leave blank until Stage 5
-OPENAI_API_KEY=<your-openai-key>
+EXPO_PUBLIC_MAPBOX_TOKEN=          # leave blank — Mapbox is deferred
 ```
 
 Find your Supabase URL and anon key at: **Dashboard → Project Settings → API**.
 
+> The OpenAI API key is **not** needed in `.env` — it runs server-side only and is set as a Supabase secret in step 4.
+
 ---
 
-### 4. Deploy the AI Edge Function
+### 4. Set up Supabase Storage and Realtime
 
-The `process-quest` Edge Function runs GPT-4o to auto-tag quests, generate adventure-style titles, and create vector embeddings.
+In the **Supabase Dashboard**:
+
+**Storage — create two public buckets:**
+1. `drop-off-photos` — used for quest drop-off verification photos
+2. `chat-photos` — used for photo sharing in quest chat
+
+For each bucket: set **Public** to on, then add an **INSERT** policy for authenticated users.
+
+**Realtime — enable for two tables:**
+
+Go to **Database → Replication** and add `messages` and `quests` to the `supabase_realtime` publication. This powers the live chat and quest status updates.
+
+---
+
+### 5. Deploy the AI Edge Functions
+
+Three Edge Functions power the AI features. Deploy all three:
 
 ```bash
-# Install Supabase CLI if you haven't already
-npm install -g supabase
-
-# Log in
+# Log in to Supabase CLI (no global install needed)
 npx supabase login
 
-# Deploy
+# Deploy all three functions
 npx supabase functions deploy process-quest --project-ref <your-project-ref>
+npx supabase functions deploy parse-quest --project-ref <your-project-ref> --no-verify-jwt
+npx supabase functions deploy chat-quest --project-ref <your-project-ref> --no-verify-jwt
 ```
 
-Then set the OpenAI API key as a secret — go to **Supabase Dashboard → Edge Functions → Secrets** and add:
+Then set the OpenAI API key as a Supabase secret — go to **Dashboard → Edge Functions → Secrets** and add:
 
 ```
 OPENAI_API_KEY = <your-openai-key>
@@ -87,13 +103,15 @@ OPENAI_API_KEY = <your-openai-key>
 
 ---
 
-### 5. Run the app
+### 6. Run the app
 
 ```bash
 npm start
 ```
 
 Scan the QR code with Expo Go, or press `i` for iOS simulator / `a` for Android emulator.
+
+> If you see module resolution errors on first run, clear the Metro cache: `npm start -- --clear`
 
 ---
 
@@ -145,7 +163,7 @@ The following are excluded by `.gitignore` and must be set up locally:
 |-------|--------|-------------|
 | 0 — Scaffold | ✅ | Expo app, folder structure, all dependencies |
 | 1 — Supabase Schema | ✅ | DB tables, RLS, pgvector, Edge Function |
-| 2 — Auth | ✅ | Sign-up, sign-in, student pass verification |
+| 2 — Auth | ✅ | Sign-up, sign-in, NUS email domain gating |
 | 3 — Quest Creation | ✅ | AI chat creation + manual form fallback |
 | 4 — Quest Feed | ✅ | Real-time feed, filters, trust-tier gating |
 | 5 — Map View | ⏭ | Deferred (Mapbox map + Fog of War) |
