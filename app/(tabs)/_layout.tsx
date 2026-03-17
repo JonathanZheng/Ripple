@@ -9,7 +9,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import {
-  Trophy,
+  MapPin,
   Layers,
   Plus,
   User,
@@ -18,7 +18,7 @@ import {
 import { useTheme } from '@/lib/ThemeContext';
 
 const TABS = [
-  { name: 'map',        label: 'Ranks',    icon: Trophy  },
+  { name: 'map',        label: 'Map',      icon: MapPin  },
   { name: 'feed',       label: 'Feed',     icon: Layers  },
   { name: 'post-quest', label: 'Post',     icon: Plus,   isAction: true },
   { name: 'profile',    label: 'Profile',  icon: User    },

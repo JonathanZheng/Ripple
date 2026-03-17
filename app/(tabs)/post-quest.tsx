@@ -6,9 +6,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  TouchableOpacity,
 } from 'react-native';
 import { useState, useRef, useEffect } from 'react';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router'; // Added useLocalSearchParams
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -30,7 +31,7 @@ import { Input } from '@/components/ui/Input';
 import { Chip } from '@/components/ui/Chip';
 import { Badge } from '@/components/ui/Badge';
 import { StepIndicator } from '@/components/ui/StepIndicator';
-import { Users, Package, Send, Zap } from 'lucide-react-native';
+import { Users, Package, Send, Zap, MapPin, CheckCircle2 } from 'lucide-react-native'; // Added icons
 import type { QuestTag, FulfilmentMode } from '@/types/database';
 
 // NUS UTown rough centre
@@ -45,7 +46,7 @@ type DeadlineLabel = (typeof DEADLINE_LABELS)[number];
 
 const RC_LOCATIONS = [
   'Tembusu College', 'CAPT', 'RC4', 'RVRC', 'Acacia', 'NUSC', 'UTR',
-  'The Deck', 'Frontier', 'Fine Food', 'UTown Green', 'Stephen Riady Centre',
+  'Stephen Riady Centre',
 ];
 
 function buildDeadlineFromLabel(label: DeadlineLabel): Date {
@@ -116,18 +117,15 @@ function TypingDots() {
   );
 }
 
-// ─── Mode Toggle (Reanimated sliding pill) ───────────────────────────────────
+// ─── Mode Toggle ─────────────────────────────────────────────────────────────
 function ModeToggle({ value, onChange }: { value: 'ai' | 'manual'; onChange: (m: 'ai' | 'manual') => void }) {
   const slideX = useSharedValue(value === 'ai' ? 0 : 1);
-
   useEffect(() => {
     slideX.value = withSpring(value === 'ai' ? 0 : 1, { damping: 20, stiffness: 200 });
   }, [value]);
-
   const pillStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: interpolate(slideX.value, [0, 1], [0, 96]) }],
   }));
-
   return (
     <View style={{
       flexDirection: 'row',
@@ -140,27 +138,12 @@ function ModeToggle({ value, onChange }: { value: 'ai' | 'manual'; onChange: (m:
       position: 'relative',
       width: 200,
     }}>
-      {/* Sliding pill */}
       <Animated.View style={[{
-        position: 'absolute',
-        top: 4,
-        left: 4,
-        width: 96,
-        bottom: 4,
-        backgroundColor: '#ffffff',
-        borderRadius: 999,
+        position: 'absolute', top: 4, left: 4, width: 96, bottom: 4, backgroundColor: '#ffffff', borderRadius: 999,
       }, pillStyle]} />
       {(['ai', 'manual'] as const).map((m) => (
-        <Pressable
-          key={m}
-          onPress={() => onChange(m)}
-          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, zIndex: 1 }}
-        >
-          <Text style={{
-            fontSize: 13,
-            fontWeight: '600',
-            color: value === m ? '#000000' : 'rgba(255,255,255,0.50)',
-          }}>
+        <Pressable key={m} onPress={() => onChange(m)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, zIndex: 1 }}>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: value === m ? '#000000' : 'rgba(255,255,255,0.50)' }}>
             {m === 'ai' ? 'AI' : 'Manual'}
           </Text>
         </Pressable>
@@ -172,12 +155,11 @@ function ModeToggle({ value, onChange }: { value: 'ai' | 'manual'; onChange: (m:
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function PostQuest() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams(); // To catch picked coordinates
   const [postMode, setPostMode] = useState<'ai' | 'manual'>('ai');
 
-  // ── AI chat state ──────────────────────────────────────────────────────────
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { id: nextId(), role: 'assistant', content: GREETING },
-  ]);
+  // AI chat state
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([{ id: nextId(), role: 'assistant', content: GREETING }]);
   const [collectedFields, setCollectedFields] = useState<Partial<QuestFields>>({});
   const [chatLoading, setChatLoading] = useState(false);
   const [questReady, setQuestReady] = useState(false);
@@ -186,10 +168,9 @@ export default function PostQuest() {
   const [pendingComplete, setPendingComplete] = useState(false);
   const [animatingText, setAnimatingText] = useState('');
   const [animatingDone, setAnimatingDone] = useState(true);
-
   const scrollRef = useRef<ScrollView>(null);
 
-  // ── Shared form state ──────────────────────────────────────────────────────
+  // Form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [tag, setTag] = useState<QuestTag | ''>('');
@@ -197,34 +178,37 @@ export default function PostQuest() {
   const [reward, setReward] = useState('');
   const [deadlineLabel, setDeadlineLabel] = useState<DeadlineLabel | ''>('');
   const [locationName, setLocationName] = useState('UTown, NUS');
+  const [latitude, setLatitude] = useState<number | null>(null); // NEW
+  const [longitude, setLongitude] = useState<number | null>(null); // NEW
   const [isFlash, setIsFlash] = useState(false);
-
   const [questType, setQuestType] = useState<'standard' | 'social' | 'crew'>('standard');
   const [maxAcceptors, setMaxAcceptors] = useState(2);
-
   const [step, setStep] = useState<Step>('Details');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const { colors } = useTheme();
-
   const stepIndex = STEPS.indexOf(step);
 
-  // ── Typing animation ───────────────────────────────────────────────────────
+  // Handle coordinates coming back from Map
+  useEffect(() => {
+    if (params.lat && params.lon) {
+      setLatitude(Number(params.lat));
+      setLongitude(Number(params.lon));
+      setStep('Location'); // Force return to Location step so they see it worked
+    }
+  }, [params.lat, params.lon]);
+
   useEffect(() => {
     if (!pendingReply) return;
-    setAnimatingDone(false);
-    setAnimatingText('');
+    setAnimatingDone(false); setAnimatingText('');
     let i = 0;
     const interval = setInterval(() => {
-      i++;
-      setAnimatingText(pendingReply.slice(0, i));
+      i++; setAnimatingText(pendingReply.slice(0, i));
       if (i >= pendingReply.length) {
-        clearInterval(interval);
-        setAnimatingDone(true);
+        clearInterval(interval); setAnimatingDone(true);
         setChatMessages((prev) => [...prev, { id: nextId(), role: 'assistant', content: pendingReply! }]);
-        setPendingReply(null);
-        if (pendingComplete) setQuestReady(true);
+        setPendingReply(null); if (pendingComplete) setQuestReady(true);
       }
     }, 12);
     return () => clearInterval(interval);
@@ -237,83 +221,28 @@ export default function PostQuest() {
   function resetForm() {
     setTitle(''); setDescription(''); setTag(''); setMode('meetup');
     setReward(''); setDeadlineLabel(''); setLocationName('UTown, NUS');
+    setLatitude(null); setLongitude(null);
     setIsFlash(false); setQuestType('standard'); setMaxAcceptors(2);
     setStep('Details'); setError('');
   }
 
-  function resetAiChat() {
-    setChatMessages([{ id: nextId(), role: 'assistant', content: GREETING }]);
-    setCollectedFields({}); setChatLoading(false); setQuestReady(false);
-    setChatInput(''); setPendingReply(null); setPendingComplete(false);
-    setAnimatingText(''); setAnimatingDone(true);
-  }
+  function handleModeSwitch(m: 'ai' | 'manual') { setPostMode(m); resetForm(); }
 
-  function handleModeSwitch(m: 'ai' | 'manual') {
-    setPostMode(m); resetAiChat(); resetForm(); setError('');
-  }
-
-  // ─── AI: Send message ──────────────────────────────────────────────────────
-  async function handleSendMessage() {
-    const text = chatInput.trim();
-    if (!text || chatLoading || !animatingDone) return;
-    const userMsg: ChatMessage = { id: nextId(), role: 'user', content: text };
-    setChatMessages((prev) => [...prev, userMsg]);
-    setChatInput('');
-    setChatLoading(true);
-    setError('');
-    try {
-      const historyForApi = [...chatMessages, userMsg].map(({ role, content }) => ({ role, content }));
-      const { data, error: fnError } = await supabase.functions.invoke('chat-quest', {
-        body: { messages: historyForApi, collected_fields: collectedFields, current_time: new Date().toISOString() },
-      });
-      if (fnError || !data) {
-        let detail = fnError?.message ?? 'unknown';
-        try {
-          const ctx = (fnError as any)?.context;
-          if (ctx) {
-            const body = await ctx.clone().json().catch(() => ctx.clone().text());
-            detail = typeof body === 'string' ? body : (body?.detail ?? body?.error ?? JSON.stringify(body));
-          }
-        } catch {}
-        setChatMessages((prev) => [...prev, { id: nextId(), role: 'assistant', content: `Error: ${detail}` }]);
-        return;
-      }
-      setCollectedFields(data.fields ?? {});
-      setPendingComplete(data.complete === true);
-      setPendingReply(data.reply ?? '');
-    } catch {
-      setChatMessages((prev) => [...prev, { id: nextId(), role: 'assistant', content: 'Something went wrong. Please try again.' }]);
-    } finally {
-      setChatLoading(false);
-    }
-  }
-
-  // ─── AI: Submit confirmed quest ────────────────────────────────────────────
-  async function handleAiSubmit() {
-    const f = collectedFields;
-    await submitQuest({
-      title: f.title ?? '',
-      description: f.description ?? '',
-      tag: (f.tag as QuestTag) || 'errands',
-      fulfilment_mode: f.fulfilment_mode ?? 'meetup',
-      reward_amount: f.reward_amount ?? 0,
-      deadline_label: f.deadline_label as DeadlineLabel,
-      location_name: f.location_name ?? 'UTown, NUS',
-    });
-  }
-
-  // ─── Manual: Submit ────────────────────────────────────────────────────────
+  // Manual: Submit
   async function handleSubmit() {
     if (!title.trim()) { setError('Quest title is required.'); return; }
-    if (!description.trim() || description.length < 20) { setError('Description must be at least 20 characters.'); return; }
-    if (!deadlineLabel) { setError('Please select a deadline.'); return; }
+    if (!description.trim() || description.length < 20) { setError('Description must be at least 20 chars.'); return; }
+    if (!deadlineLabel) { setError('Select a deadline.'); return; }
+    
     const deadlineDate = buildDeadlineFromLabel(deadlineLabel as DeadlineLabel);
-    if (deadlineDate <= new Date()) { setError('Deadline must be in the future.'); return; }
     setLoading(true); setError('');
+    
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setError('Not signed in.'); return; }
+      
       const flashExpiresAt = isFlash ? new Date(Date.now() + 30 * 60 * 1000).toISOString() : null;
+      
       const { data: quest, error: insertError } = await supabase
         .from('quests')
         .insert({
@@ -323,559 +252,118 @@ export default function PostQuest() {
           reward_amount: questType === 'social' ? 0 : (parseFloat(reward) || 0),
           deadline: deadlineDate.toISOString(),
           location_name: locationName || 'UTown, NUS',
-          latitude: UTOWN_LAT, longitude: UTOWN_LNG,
-          geohash: encodeGeohash(UTOWN_LAT, UTOWN_LNG),
+          latitude: latitude || UTOWN_LAT, // Use picked lat
+          longitude: longitude || UTOWN_LNG, // Use picked lon
+          geohash: encodeGeohash(latitude || UTOWN_LAT, longitude || UTOWN_LNG),
           status: 'open', is_flash: isFlash, flash_expires_at: flashExpiresAt,
           quest_type: questType,
           max_acceptors: questType === 'crew' ? maxAcceptors : 1,
         })
         .select('id').single();
-      if (insertError || !quest) { setError(insertError?.message ?? 'Failed to create quest.'); return; }
-      supabase.functions.invoke('process-quest', { body: { quest_id: quest.id } });
-      resetForm(); resetAiChat();
+
+      if (insertError) { setError(insertError.message); return; }
+      
       router.replace('/(tabs)/feed');
     } catch (e: any) {
-      setError(e?.message ?? 'Something went wrong.');
+      setError(e.message);
     } finally {
       setLoading(false);
     }
-  }
-
-  async function submitQuest(fields: {
-    title: string; description: string; tag: QuestTag;
-    fulfilment_mode: 'meetup' | 'dropoff'; reward_amount: number;
-    deadline_label: DeadlineLabel; location_name: string;
-  }) {
-    if (!fields.title.trim()) { setError('Quest title is required.'); return; }
-    if (!fields.description.trim() || fields.description.length < 20) { setError('Description must be at least 20 characters.'); return; }
-    if (!fields.deadline_label) { setError('Please select a deadline.'); return; }
-    const deadlineDate = buildDeadlineFromLabel(fields.deadline_label);
-    if (deadlineDate <= new Date()) { setError('Deadline must be in the future.'); return; }
-    setLoading(true); setError('');
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setError('Not signed in.'); return; }
-      const { data: quest, error: insertError } = await supabase
-        .from('quests')
-        .insert({
-          poster_id: user.id,
-          title: fields.title.trim(), description: fields.description.trim(),
-          tag: fields.tag, fulfilment_mode: fields.fulfilment_mode,
-          reward_amount: fields.reward_amount,
-          deadline: deadlineDate.toISOString(),
-          location_name: fields.location_name || 'UTown, NUS',
-          latitude: UTOWN_LAT, longitude: UTOWN_LNG,
-          geohash: encodeGeohash(UTOWN_LAT, UTOWN_LNG),
-          status: 'open', is_flash: false, flash_expires_at: null,
-          quest_type: 'standard', max_acceptors: 1,
-        })
-        .select('id').single();
-      if (insertError || !quest) { setError(insertError?.message ?? 'Failed to create quest.'); return; }
-      supabase.functions.invoke('process-quest', { body: { quest_id: quest.id } });
-      resetForm(); resetAiChat();
-      router.replace('/(tabs)/feed');
-    } catch (e: any) {
-      setError(e?.message ?? 'Something went wrong.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function validateDetails() {
-    if (!title.trim()) return 'Quest title is required.';
-    if (!description.trim() || description.length < 20) return 'Description must be at least 20 characters.';
-    return null;
-  }
-
-  function next() {
-    setError('');
-    if (step === 'Details') {
-      const err = validateDetails();
-      if (err) { setError(err); return; }
-    }
-    if (step === 'Reward') {
-      if (!deadlineLabel) { setError('Please select a deadline.'); return; }
-      const d = buildDeadlineFromLabel(deadlineLabel as DeadlineLabel);
-      if (d <= new Date()) { setError('Deadline must be in the future.'); return; }
-    }
-    const nextIndex = stepIndex + 1;
-    if (nextIndex < STEPS.length) setStep(STEPS[nextIndex]);
-  }
-
-  function back() { setError(''); const p = stepIndex - 1; if (p >= 0) setStep(STEPS[p]); }
-
-  // ─── AI Mode ───────────────────────────────────────────────────────────────
-  if (postMode === 'ai') {
-    const f = collectedFields;
-    const rewardText = typeof f.reward_amount === 'number' && f.reward_amount > 0
-      ? `$${f.reward_amount.toFixed(2)}`
-      : 'Favour';
-
-    return (
-      <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: colors.background }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        <ScreenHeader title="Post a Quest" />
-
-        {/* Mode Toggle */}
-        <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
-          <ModeToggle value={postMode} onChange={handleModeSwitch} />
-        </View>
-
-        {/* Chat area */}
-        <ScrollView
-          ref={scrollRef}
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          {chatMessages.map((msg) => (
-            <View
-              key={msg.id}
-              style={{
-                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                maxWidth: '80%',
-                marginBottom: 10,
-              }}
-            >
-              <View style={{
-                backgroundColor: msg.role === 'user'
-                  ? 'rgba(124,58,237,0.75)'
-                  : 'rgba(255,255,255,0.06)',
-                borderWidth: 1,
-                borderColor: msg.role === 'user'
-                  ? 'rgba(124,58,237,0.40)'
-                  : 'rgba(255,255,255,0.10)',
-                borderRadius: 18,
-                borderBottomRightRadius: msg.role === 'user' ? 4 : 18,
-                borderBottomLeftRadius: msg.role === 'assistant' ? 4 : 18,
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-              }}>
-                <Text style={{ color: '#ffffff', fontSize: 14, lineHeight: 21 }}>
-                  {msg.content}
-                </Text>
-              </View>
-            </View>
-          ))}
-
-          {/* Typing / animating bubble */}
-          {(chatLoading || (!animatingDone && animatingText)) && (
-            <View style={{ alignSelf: 'flex-start', maxWidth: '80%', marginBottom: 10 }}>
-              <View style={{
-                backgroundColor: 'rgba(255,255,255,0.06)',
-                borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.10)',
-                borderRadius: 18,
-                borderBottomLeftRadius: 4,
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-              }}>
-                {chatLoading && !animatingText ? (
-                  <TypingDots />
-                ) : (
-                  <Text style={{ color: '#ffffff', fontSize: 14, lineHeight: 21 }}>
-                    {animatingText}
-                  </Text>
-                )}
-              </View>
-            </View>
-          )}
-        </ScrollView>
-
-        {/* Confirmation card */}
-        {questReady && (
-          <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-            <Card glow>
-              <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 6 }}>
-                QUEST READY TO POST
-              </Text>
-              {f.title && (
-                <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '700', letterSpacing: -0.4, marginBottom: 10 }}>
-                  {f.title}
-                </Text>
-              )}
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                {f.fulfilment_mode && (
-                  <Badge variant="mode" value={f.fulfilment_mode} />
-                )}
-                {f.deadline_label && (
-                  <Badge variant="default" value={f.deadline_label} />
-                )}
-                <Badge variant="default" value={rewardText} />
-                {f.location_name && (
-                  <Badge variant="default" value={f.location_name} />
-                )}
-                {f.tag && (
-                  <Badge variant="tag" value={f.tag} />
-                )}
-              </View>
-
-              {error ? (
-                <Text style={{ color: '#ef4444', fontSize: 12, marginBottom: 10 }}>{error}</Text>
-              ) : null}
-
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <Button
-                  variant="secondary"
-                  size="md"
-                  style={{ flex: 1 }}
-                  onPress={() => setQuestReady(false)}
-                >
-                  Keep editing
-                </Button>
-                <Button
-                  variant="primary"
-                  size="md"
-                  style={{ flex: 1 }}
-                  loading={loading}
-                  onPress={handleAiSubmit}
-                >
-                  Post Quest
-                </Button>
-              </View>
-            </Card>
-          </View>
-        )}
-
-        {/* Input bar */}
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'flex-end',
-          gap: 10,
-          paddingHorizontal: 16,
-          paddingBottom: insets.bottom + 100,
-          paddingTop: 10,
-          borderTopWidth: 1,
-          borderTopColor: 'rgba(255,255,255,0.06)',
-          backgroundColor: 'rgba(0,0,0,0.80)',
-        }}>
-          <View style={{ flex: 1 }}>
-            <Input
-              placeholder="Type a message..."
-              value={chatInput}
-              onChangeText={setChatInput}
-              multiline
-              returnKeyType="send"
-              onSubmitEditing={handleSendMessage}
-              editable={!chatLoading && animatingDone}
-              rounded
-            />
-          </View>
-          <Pressable
-            onPress={handleSendMessage}
-            disabled={!chatInput.trim() || chatLoading || !animatingDone}
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: chatInput.trim() && animatingDone && !chatLoading
-                ? '#ffffff'
-                : 'rgba(255,255,255,0.10)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 2,
-            }}
-          >
-            <Send
-              size={18}
-              color={chatInput.trim() && animatingDone && !chatLoading ? '#000000' : 'rgba(255,255,255,0.40)'}
-              strokeWidth={2}
-            />
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
-    );
   }
 
   // ─── Manual Mode: Details ──────────────────────────────────────────────────
   if (step === 'Details') {
     return (
-      <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: colors.background }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScreenHeader title="Post a Quest" />
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 120 }}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 150 }}>
           <View style={{ marginBottom: 20 }}>
             <ModeToggle value={postMode} onChange={handleModeSwitch} />
           </View>
-
           <StepIndicator steps={[...STEPS]} currentIndex={stepIndex} />
-
-          <Text style={{ color: '#ffffff', fontSize: 22, fontWeight: '700', letterSpacing: -0.5, marginTop: 20, marginBottom: 4 }}>
-            What do you need?
-          </Text>
-          <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, marginBottom: 24 }}>
-            Describe your quest clearly.
-          </Text>
-
-          {error ? (
-            <Text style={{ color: '#ef4444', fontSize: 13, marginBottom: 16 }}>{error}</Text>
-          ) : null}
-
-          <Input
-            label="Quest Title"
-            placeholder="e.g. Need someone to pick up food from The Deck"
-            value={title}
-            onChangeText={setTitle}
-            maxLength={80}
-          />
-
-          <View style={{ height: 16 }} />
-
-          <Input
-            label="Description"
-            placeholder="More details — what exactly do you need, any special instructions..."
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={4}
-            style={{ minHeight: 100, textAlignVertical: 'top' }}
-          />
-
-          <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginTop: 20, marginBottom: 12 }}>
-            CATEGORY (OPTIONAL)
-          </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+          
+          <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700', marginTop: 20 }}>What do you need?</Text>
+          <Input label="Quest Title" placeholder="e.g. Help with grocery pickup" value={title} onChangeText={setTitle} />
+          <View style={{height: 12}} />
+          <Input label="Description" placeholder="Provide more details..." value={description} onChangeText={setDescription} multiline numberOfLines={4} style={{ minHeight: 100 }} />
+          
+          <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 20 }}>CATEGORY</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 12 }}>
             {QUEST_TAGS.map((t) => (
-              <Chip
-                key={t}
-                label={t.charAt(0).toUpperCase() + t.slice(1)}
-                selected={tag === t}
-                color={(TAG_COLOURS as Record<string, string>)[t]}
-                onPress={() => setTag(tag === t ? '' : t)}
-              />
+              <Chip key={t} label={t} selected={tag === t} onPress={() => setTag(t)} color={(TAG_COLOURS as any)[t]} />
             ))}
           </View>
 
-          <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginBottom: 12 }}>
-            QUEST TYPE
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
-            {(['standard', 'social', 'crew'] as const).map((qt) => (
-              <Chip
-                key={qt}
-                label={qt.charAt(0).toUpperCase() + qt.slice(1)}
-                selected={questType === qt}
-                onPress={() => setQuestType(qt)}
-              />
-            ))}
-          </View>
-
-          {questType === 'social' && (
-            <View style={{ backgroundColor: 'rgba(217,70,239,0.08)', borderWidth: 1, borderColor: 'rgba(217,70,239,0.20)', borderRadius: 12, padding: 12, marginBottom: 16 }}>
-              <Text style={{ color: '#d946ef', fontSize: 13, lineHeight: 19 }}>
-                Social quests are for community activities — no payment involved.
-              </Text>
-            </View>
-          )}
-
-          {questType === 'crew' && (
-            <View style={{ marginBottom: 16 }}>
-              <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginBottom: 10 }}>
-                CREW SIZE
-              </Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {[2, 3, 4, 5].map((n) => (
-                  <Chip
-                    key={n}
-                    label={String(n)}
-                    selected={maxAcceptors === n}
-                    onPress={() => setMaxAcceptors(n)}
-                  />
-                ))}
-              </View>
-            </View>
-          )}
-
-          <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginBottom: 12 }}>
-            FULFILMENT MODE
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 28 }}>
-            {(['meetup', 'dropoff'] as FulfilmentMode[]).map((m) => (
-              <Card
-                key={m}
-                variant={mode === m ? 'elevated' : 'default'}
-                glow={mode === m}
-                onPress={() => setMode(m)}
-                style={{ flex: 1, alignItems: 'center', paddingVertical: 20 }}
-              >
-                {m === 'meetup'
-                  ? <Users size={22} color={mode === m ? '#a78bfa' : 'rgba(255,255,255,0.40)'} strokeWidth={1.8} />
-                  : <Package size={22} color={mode === m ? '#a78bfa' : 'rgba(255,255,255,0.40)'} strokeWidth={1.8} />
-                }
-                <Text style={{
-                  color: mode === m ? '#ffffff' : 'rgba(255,255,255,0.50)',
-                  fontSize: 13,
-                  fontWeight: '600',
-                  marginTop: 8,
-                }}>
-                  {m === 'meetup' ? 'Meet Up' : 'Drop Off'}
-                </Text>
-              </Card>
-            ))}
-          </View>
-
-          <Button variant="primary" size="lg" onPress={next} style={{ width: '100%' }}>
-            Next
-          </Button>
+          <Button variant="primary" size="lg" onPress={() => setStep('Location')} style={{ marginTop: 20 }}>Next</Button>
         </ScrollView>
       </KeyboardAvoidingView>
     );
   }
 
-  // ─── Manual Mode: Location ─────────────────────────────────────────────────
+  // ─── Manual Mode: Location (MAP PICKER ADDED) ──────────────────────────────
   if (step === 'Location') {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <ScreenHeader title="Post a Quest" />
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 120 }}>
-          <View style={{ marginBottom: 20 }}>
-            <ModeToggle value={postMode} onChange={handleModeSwitch} />
-          </View>
-
+        <ScreenHeader title="Location" />
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 150 }}>
           <StepIndicator steps={[...STEPS]} currentIndex={stepIndex} />
+          
+          <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700', marginTop: 20 }}>Where?</Text>
+          
+          {/* MAP PICKER BUTTON */}
+          <TouchableOpacity 
+            onPress={() => router.push({ pathname: '/(tabs)/map', params: { mode: 'pick' } })}
+            style={{
+              backgroundColor: 'rgba(124,58,237,0.1)',
+              borderWidth: 1,
+              borderColor: latitude ? '#10b981' : '#7c3aed',
+              borderRadius: 16,
+              padding: 24,
+              alignItems: 'center',
+              marginVertical: 24,
+              flexDirection: 'row',
+              justifyContent: 'center',
+              gap: 12
+            }}
+          >
+            {latitude ? <CheckCircle2 size={24} color="#10b981" /> : <MapPin size={24} color="#a78bfa" />}
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+              {latitude ? "Location Set on Map" : "Pin Location on Map"}
+            </Text>
+          </TouchableOpacity>
 
-          <Text style={{ color: '#ffffff', fontSize: 22, fontWeight: '700', letterSpacing: -0.5, marginTop: 20, marginBottom: 4 }}>
-            Where?
-          </Text>
-          <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, marginBottom: 24 }}>
-            Select a UTown location or type a custom one.
-          </Text>
-
-          {error ? (
-            <Text style={{ color: '#ef4444', fontSize: 13, marginBottom: 16 }}>{error}</Text>
-          ) : null}
-
-          <Input
-            label="Location"
-            placeholder="e.g. RC4 Lounge, Level 2"
-            value={locationName}
-            onChangeText={setLocationName}
-          />
-
-          <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginTop: 20, marginBottom: 12 }}>
-            QUICK SELECT
-          </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 28 }}>
-            {RC_LOCATIONS.map((loc) => (
-              <Chip
-                key={loc}
-                label={loc}
-                selected={locationName === loc}
-                onPress={() => setLocationName(loc)}
-              />
-            ))}
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <Button variant="secondary" size="lg" style={{ flex: 1 }} onPress={back}>
-              Back
-            </Button>
-            <Button variant="primary" size="lg" style={{ flex: 1 }} onPress={next}>
-              Next
-            </Button>
+          <Input label="Location Name" placeholder="e.g. Level 2 Lounge" value={locationName} onChangeText={setLocationName} />
+          
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 40 }}>
+            <Button variant="secondary" size="lg" style={{ flex: 1 }} onPress={() => setStep('Details')}>Back</Button>
+            <Button variant="primary" size="lg" style={{ flex: 1 }} onPress={() => setStep('Reward')}>Next</Button>
           </View>
         </ScrollView>
       </View>
     );
   }
 
-  // ─── Manual Mode: Reward & Deadline ───────────────────────────────────────
+  // ─── Manual Mode: Reward ───────────────────────────────────────────────────
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScreenHeader title="Post a Quest" />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 120 }}>
-        <View style={{ marginBottom: 20 }}>
-          <ModeToggle value={postMode} onChange={handleModeSwitch} />
-        </View>
-
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScreenHeader title="Reward" />
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 150 }}>
         <StepIndicator steps={[...STEPS]} currentIndex={stepIndex} />
-
-        <Text style={{ color: '#ffffff', fontSize: 22, fontWeight: '700', letterSpacing: -0.5, marginTop: 20, marginBottom: 4 }}>
-          Reward & Deadline
-        </Text>
-        <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, marginBottom: 24 }}>
-          How much are you offering and by when?
-        </Text>
-
-        {error ? (
-          <Text style={{ color: '#ef4444', fontSize: 13, marginBottom: 16 }}>{error}</Text>
-        ) : null}
-
-        <Input
-          label="Cash Reward (SGD, optional)"
-          placeholder="e.g. 3.50"
-          keyboardType="decimal-pad"
-          value={reward}
-          onChangeText={setReward}
-        />
-        <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 6, marginBottom: 20 }}>
-          Leave blank for favour-only quests. Payment settled privately via PayNow/cash.
-        </Text>
-
-        <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginBottom: 12 }}>
-          DEADLINE
-        </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
-          {DEADLINE_LABELS.map((label) => (
-            <Chip
-              key={label}
-              label={label}
-              selected={deadlineLabel === label}
-              onPress={() => setDeadlineLabel(label)}
-            />
+        <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700', marginTop: 20 }}>Reward & Deadline</Text>
+        
+        <Input label="Cash Reward ($)" placeholder="3.50" keyboardType="decimal-pad" value={reward} onChangeText={setReward} />
+        
+        <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 20 }}>DEADLINE</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 12 }}>
+          {DEADLINE_LABELS.map((l) => (
+            <Chip key={l} label={l} selected={deadlineLabel === l} onPress={() => setDeadlineLabel(l)} />
           ))}
         </View>
 
-        {/* Flash Quest toggle */}
-        <Card style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-            <View style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              backgroundColor: 'rgba(245,158,11,0.10)',
-              borderWidth: 1,
-              borderColor: 'rgba(245,158,11,0.20)',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <Zap size={16} color="#f59e0b" strokeWidth={2} />
-            </View>
-            <View>
-              <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '600', marginBottom: 2 }}>
-                Flash Quest
-              </Text>
-              <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 12 }}>
-                Urgent — expires in 30 minutes
-              </Text>
-            </View>
-          </View>
-          <Switch
-            value={isFlash}
-            onValueChange={setIsFlash}
-            trackColor={{ false: 'rgba(255,255,255,0.10)', true: '#7c3aed' }}
-            thumbColor="#ffffff"
-          />
-        </Card>
-
-        <View style={{ flexDirection: 'row', gap: 12 }}>
-          <Button variant="secondary" size="lg" style={{ flex: 1 }} onPress={back}>
-            Back
-          </Button>
-          <Button variant="primary" size="lg" style={{ flex: 1 }} loading={loading} onPress={handleSubmit}>
-            Post Quest
-          </Button>
-        </View>
+        <Button variant="primary" size="lg" loading={loading} onPress={handleSubmit} style={{ marginTop: 40 }}>Post Quest</Button>
+        <Button variant="secondary" size="lg" onPress={() => setStep('Location')} style={{ marginTop: 12 }}>Back</Button>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

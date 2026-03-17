@@ -1,239 +1,292 @@
-import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
-import { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  TouchableOpacity,
+  StyleSheet,
+  FlatList,
+  TextInput,
+  Platform,
+} from 'react-native';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { startOfWeek, endOfWeek, format } from 'date-fns';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
-import { RC_OPTIONS, TRUST_TIER_CONFIG } from '@/constants';
-import { ScreenHeader } from '@/components/ui/ScreenHeader';
-import { Card } from '@/components/ui/Card';
 import { useTheme } from '@/lib/ThemeContext';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { ProgressBar } from '@/components/ui/ProgressBar';
-import { RefreshCw } from 'lucide-react-native';
-import type { Profile } from '@/types/database';
+import { TAG_COLOURS, QUEST_TAGS } from '@/constants';
+import { QuestCard } from '@/components/QuestCard';
+import { Chip } from '@/components/ui/Chip';
+import { X, MapPin, Search, Check, Navigation, Layers } from 'lucide-react-native';
+import type { Quest, QuestTag } from '@/types/database';
 
-type RCEntry = {
-  rc: string;
-  questCount: number;
-  topContributor: { display_name: string; count: number; trust_tier: Profile['trust_tier'] } | null;
-};
+// FREE MAP ENGINE
+import { Map, Marker } from 'pigeon-maps';
 
-export default function LeaderboardScreen() {
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isMobile = SCREEN_WIDTH < 768;
+
+// Distance threshold for clustering (approximate meters/coord units)
+const CLUSTER_RADIUS = 0.001; 
+
+export default function MapScreen() {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams();
+  const isPickingMode = params.mode === 'pick';
+
   const { session } = useSession();
   const userId = session?.user?.id;
-  const { profile: myProfile } = useProfile(userId);
-  const insets = useSafeAreaInsets();
+  const { profile } = useProfile(userId);
+  const userTier = profile?.trust_tier ?? 'wanderer';
 
-  const { colors } = useTheme();
-  const [entries, setEntries] = useState<RCEntry[]>([]);
+  const [quests, setQuests] = useState<Quest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [weekLabel, setWeekLabel] = useState('');
+  const [search, setSearch] = useState('');
+  const [tagFilter, setTagFilter] = useState<QuestTag | 'all'>('all');
 
-  const fetchLeaderboard = useCallback(async () => {
-    setLoading(true);
-    const now = new Date();
-    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-    setWeekLabel(`${format(weekStart, 'MMM d')} – ${format(weekEnd, 'MMM d')}`);
+  // Interaction State
+  const [selectedQuests, setSelectedQuests] = useState<Quest[]>([]); // Now an array for clustering
+  const [pickedLocation, setPickedLocation] = useState<[number, number] | null>(null);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  
+  const panelWidth = isMobile ? SCREEN_WIDTH : 450; // Made slightly wider for lists
+  const sidePanelAnim = useRef(new Animated.Value(panelWidth)).current;
 
-    const { data: quests } = await supabase
-      .from('quests')
-      .select('acceptor_id')
-      .eq('status', 'completed')
-      .not('acceptor_id', 'is', null)
-      .gte('created_at', weekStart.toISOString())
-      .lte('created_at', weekEnd.toISOString());
-
-    if (!quests || quests.length === 0) {
-      setEntries(RC_OPTIONS.map(rc => ({ rc, questCount: 0, topContributor: null })));
-      setLoading(false);
-      return;
-    }
-
-    const uniqueIds = [...new Set(quests.map(q => q.acceptor_id as string))];
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, display_name, rc, trust_tier')
-      .in('id', uniqueIds);
-
-    if (!profiles) { setLoading(false); return; }
-
-    const profileMap = new Map<string, typeof profiles[0]>();
-    profiles.forEach(p => profileMap.set(p.id, p));
-
-    const rcQuestCount: Record<string, number> = {};
-    const userQuestCount: Record<string, number> = {};
-
-    for (const q of quests) {
-      const p = profileMap.get(q.acceptor_id as string);
-      if (!p) continue;
-      rcQuestCount[p.rc] = (rcQuestCount[p.rc] ?? 0) + 1;
-      userQuestCount[p.id] = (userQuestCount[p.id] ?? 0) + 1;
-    }
-
-    const result: RCEntry[] = RC_OPTIONS.map(rc => {
-      const questCount = rcQuestCount[rc] ?? 0;
-      let topContributor: RCEntry['topContributor'] = null;
-      let topCount = 0;
-      profiles.filter(p => p.rc === rc).forEach(p => {
-        const count = userQuestCount[p.id] ?? 0;
-        if (count > topCount) {
-          topCount = count;
-          topContributor = { display_name: p.display_name, count, trust_tier: p.trust_tier as Profile['trust_tier'] };
-        }
-      });
-      return { rc, questCount, topContributor };
-    });
-
-    result.sort((a, b) => b.questCount - a.questCount);
-    setEntries(result);
+  const fetchQuests = useCallback(async () => {
+    const { data, error } = await supabase.from('quests').select('*').eq('status', 'open');
+    if (!error && data) setQuests(data as Quest[]);
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchLeaderboard(); }, [fetchLeaderboard]);
+  useFocusEffect(useCallback(() => { fetchQuests(); }, [fetchQuests]));
 
-  const myRcRank = myProfile ? entries.findIndex(e => e.rc === myProfile.rc) + 1 : null;
-  const topCount = entries[0]?.questCount ?? 0;
+  const openClusterDetail = (questsInCluster: Quest[]) => {
+    if (isPickingMode) return;
+    setSelectedQuests(questsInCluster);
+    setIsPanelOpen(true);
+    Animated.spring(sidePanelAnim, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 8
+    }).start();
+  };
+
+  const closeSidePanel = () => {
+    Animated.spring(sidePanelAnim, { toValue: panelWidth, useNativeDriver: true }).start();
+    setTimeout(() => {
+      setSelectedQuests([]);
+      setIsPanelOpen(false);
+    }, 300);
+  };
+
+  const filteredQuests = quests.filter(q => {
+    const matchesSearch = !search || q.title.toLowerCase().includes(search.toLowerCase());
+    const matchesTag = tagFilter === 'all' || q.tag === tagFilter;
+    return matchesSearch && matchesTag;
+  });
+
+  // --- CLUSTERING LOGIC ---
+  const getClusters = () => {
+    const clusters: Quest[][] = [];
+    const processedIndices = new Set();
+
+    filteredQuests.forEach((q, i) => {
+      if (processedIndices.has(i)) return;
+      if (!q.latitude || !q.longitude) return;
+
+      const cluster = [q];
+      processedIndices.add(i);
+
+      filteredQuests.forEach((otherQ, j) => {
+        if (i === j || processedIndices.has(j)) return;
+        
+        // Calculate distance (simple Euclidean for small distances)
+        const dist = Math.sqrt(
+          Math.pow((q.latitude || 0) - (otherQ.latitude || 0), 2) + 
+          Math.pow((q.longitude || 0) - (otherQ.longitude || 0), 2)
+        );
+
+        if (dist < CLUSTER_RADIUS) {
+          cluster.push(otherQ);
+          processedIndices.add(j);
+        }
+      });
+      clusters.push(cluster);
+    });
+    return clusters;
+  };
+
+  const clusters = getClusters();
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
-        <ScreenHeader
-          title="RC Leaderboard"
-          subtitle={weekLabel ? `Week of ${weekLabel}` : undefined}
-          rightAction={
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={RefreshCw}
-              iconOnly
-              onPress={fetchLeaderboard}
-            />
-          }
-        />
+      <View style={styles.mapWrapper}>
+        <Map 
+          defaultCenter={[1.3521, 103.8198]} 
+          defaultZoom={13}
+          onClick={({ latLng }) => isPickingMode ? setPickedLocation(latLng) : closeSidePanel()}
+          boxClassname="map-dark-mode"
+        >
+          {!isPickingMode && clusters.map((clusterQuests, idx) => {
+            const firstQuest = clusterQuests[0];
+            const count = clusterQuests.length;
+            const isCluster = count > 1;
 
-        {/* My RC highlight */}
-        {myProfile && myRcRank && myRcRank > 0 && (
-          <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
-            <Card glow style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View>
-                <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 4 }}>
-                  YOUR COLLEGE
-                </Text>
-                <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 18, letterSpacing: -0.4 }}>
-                  {myProfile.rc}
-                </Text>
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 11, marginBottom: 2 }}>
-                  Rank
-                </Text>
-                <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 28, letterSpacing: -1 }}>
-                  #{myRcRank}
-                </Text>
-              </View>
-            </Card>
-          </View>
-        )}
-
-        {/* Leaderboard */}
-        {loading ? (
-          <ActivityIndicator color="rgba(255,255,255,0.30)" style={{ marginTop: 60 }} />
-        ) : (
-          <View style={{ paddingHorizontal: 20, gap: 8 }}>
-            {entries.map((entry, i) => {
-              const isMyRc = myProfile?.rc === entry.rc;
-              const tierConfig = entry.topContributor
-                ? TRUST_TIER_CONFIG[entry.topContributor.trust_tier]
-                : null;
-
-              return (
-                <Card key={entry.rc} glow={isMyRc} variant={isMyRc ? 'elevated' : 'default'}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                    {/* Rank indicator */}
-                    <View
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 11,
-                        backgroundColor: i < 3 ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
-                        borderWidth: 1,
-                        borderColor: i < 3 ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Text style={{
-                        color: i < 3 ? '#ffffff' : 'rgba(255,255,255,0.40)',
-                        fontSize: i < 3 ? 15 : 13,
-                        fontWeight: '700',
-                      }}>
-                        {i === 0 ? '1' : i === 1 ? '2' : i === 2 ? '3' : `${i + 1}`}
-                      </Text>
+            return (
+              <Marker
+                key={firstQuest.id}
+                width={isCluster ? 50 : 40}
+                anchor={[firstQuest.latitude!, firstQuest.longitude!]}
+              >
+                <div 
+                  style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openClusterDetail(clusterQuests);
+                  }}
+                >
+                  {isCluster ? (
+                    <View style={styles.clusterMarker}>
+                      <Text style={styles.clusterText}>{count}</Text>
                     </View>
-
-                    {/* RC info */}
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                        <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 15, letterSpacing: -0.3 }}>
-                          {entry.rc}
-                        </Text>
-                        {isMyRc && <Badge variant="default" value="You" />}
-                      </View>
-                      {entry.topContributor ? (
-                        <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 12 }}>
-                          Top:{' '}
-                          <Text style={{ color: tierConfig?.colour ?? 'rgba(255,255,255,0.60)', fontWeight: '600' }}>
-                            {entry.topContributor.display_name}
-                          </Text>
-                          {'  ·  ' + entry.topContributor.count + ' quest' + (entry.topContributor.count !== 1 ? 's' : '')}
-                        </Text>
-                      ) : (
-                        <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 12 }}>
-                          No completions yet
-                        </Text>
-                      )}
-                    </View>
-
-                    {/* Count */}
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 20, letterSpacing: -0.5 }}>
-                        {entry.questCount}
-                      </Text>
-                      <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>quests</Text>
-                    </View>
-                  </View>
-
-                  {/* Progress bar */}
-                  {topCount > 0 && (
-                    <View style={{ marginTop: 14 }}>
-                      <ProgressBar
-                        progress={entry.questCount / topCount}
-                        color={isMyRc ? '#7c3aed' : 'rgba(255,255,255,0.20)'}
-                        height={3}
-                      />
+                  ) : (
+                    <View style={[styles.markerBubble, { backgroundColor: TAG_COLOURS[firstQuest.tag] || '#7c3aed' }]}>
+                      <MapPin size={18} color="#fff" />
                     </View>
                   )}
-                </Card>
-              );
-            })}
+                </div>
+              </Marker>
+            );
+          })}
 
-            {entries.every(e => e.questCount === 0) && (
-              <View style={{ paddingVertical: 48, alignItems: 'center' }}>
-                <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 15, letterSpacing: -0.2 }}>
-                  No quests completed this week
-                </Text>
-                <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13, marginTop: 4 }}>
-                  Be the first to help your college
-                </Text>
+          {isPickingMode && pickedLocation && (
+            <Marker anchor={pickedLocation} width={40}>
+              <View style={styles.pickedMarker}><MapPin size={24} color="#fff" /></View>
+            </Marker>
+          )}
+        </Map>
+      </View>
+
+      {/* FLOATING PILL SEARCH */}
+      {!isPickingMode && (
+        <View style={[styles.floatingOverlay, { top: insets.top + 20 }]} pointerEvents="box-none">
+          <View style={[styles.searchPill, { backgroundColor: 'rgba(30, 30, 30, 0.85)' }]} className="glass-effect">
+            <Search size={20} color="rgba(255,255,255,0.5)" style={{ marginRight: 12 }} />
+            <TextInput placeholder="Search quests..." placeholderTextColor="rgba(255,255,255,0.4)" value={search} onChangeText={setSearch} style={styles.minimalInput} />
+          </View>
+          <View style={styles.chipContainer} pointerEvents="box-none">
+            <FlatList
+              horizontal
+              data={['all', ...QUEST_TAGS]}
+              contentContainerStyle={styles.filterList}
+              renderItem={({ item }) => (
+                <Chip label={item} selected={tagFilter === item} color={(TAG_COLOURS as any)[item]} onPress={() => setTagFilter(item as any)} style={styles.opaqueChip} />
+              )}
+            />
+          </View>
+        </View>
+      )}
+
+      {/* SIDEBAR / SIDE PANEL (HANDLES CLUSTERS) */}
+      <Animated.View
+        style={[
+          styles.sidePanel,
+          {
+            backgroundColor: 'rgba(15, 15, 15, 0.9)',
+            transform: [{ translateX: sidePanelAnim }],
+            paddingTop: insets.top + 20,
+            display: isPanelOpen ? 'flex' : 'none',
+          }
+        ]}
+        className="glass-effect"
+      >
+        <View style={{ flex: 1 }}>
+          <View style={styles.sidebarHeader}>
+            <View>
+              <Text style={styles.panelTitle}>
+                {selectedQuests.length > 1 ? `${selectedQuests.length} Quests Here` : 'Quest Details'}
+              </Text>
+              {selectedQuests.length > 1 && <Text style={styles.sidebarSub}>Multiple tasks found at this location</Text>}
+            </View>
+            <TouchableOpacity onPress={closeSidePanel}><X size={28} color="#fff" /></TouchableOpacity>
+          </View>
+
+          <FlatList
+            data={selectedQuests}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ padding: 24, gap: 24 }}
+            renderItem={({ item }) => (
+              <View style={styles.clusterItem}>
+                <QuestCard quest={item} userTier={userTier} />
+                <TouchableOpacity
+                  onPress={() => router.push(`/quest/${item.id}`)}
+                  style={styles.viewQuestBtn}
+                >
+                  <Navigation size={18} color="#fff" />
+                  <Text style={styles.viewQuestText}>Open Full Details</Text>
+                </TouchableOpacity>
               </View>
             )}
-          </View>
-        )}
-      </ScrollView>
+          />
+        </View>
+      </Animated.View>
+
+      {/* PICKING UI */}
+      {isPickingMode && (
+        <View style={[styles.pickUI, { bottom: insets.bottom + 30 }]} className="glass-effect">
+          <Text style={styles.pickTitle}>{pickedLocation ? "Location selected" : "Tap map to set location"}</Text>
+          {pickedLocation && (
+            <TouchableOpacity style={styles.confirmBtn} onPress={() => router.replace({ pathname: '/(tabs)/post-quest', params: { lat: pickedLocation[0], lon: pickedLocation[1] } })}>
+              <Check size={20} color="#fff" /><Text style={styles.confirmBtnText}>Confirm Location</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 12 }}><Text style={{ color: 'rgba(255,255,255,0.4)' }}>Cancel</Text></TouchableOpacity>
+        </View>
+      )}
+
+      <style>{`
+        .map-dark-mode { filter: invert(90%) hue-rotate(180deg) brightness(95%); }
+        .glass-effect { backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); }
+        input:focus { outline: none !important; }
+      `}</style>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  mapWrapper: { ...StyleSheet.absoluteFillObject, backgroundColor: '#111' },
+  floatingOverlay: { position: 'absolute', left: 20, zIndex: 100, alignItems: 'flex-start' },
+  searchPill: { flexDirection: 'row', alignItems: 'center', width: 380, height: 52, borderRadius: 26, paddingHorizontal: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12 },
+  minimalInput: { flex: 1, color: '#fff', fontSize: 16 },
+  filterList: { gap: 8 },
+  opaqueChip: { backgroundColor: 'rgba(45, 45, 45, 0.98)', borderColor: 'rgba(255,255,255,0.15)', borderWidth: 1 },
+  chipContainer: {
+    marginTop: 12,
+    width: '100%',
+  },
+  
+  // MARKER STYLES
+  markerBubble: { padding: 8, borderRadius: 20, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', opacity: 0.7},
+  clusterMarker: { backgroundColor: '#7c3aed', width: 40, height: 40, borderRadius: 20, borderWidth: 3, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: '#7c3aed', shadowRadius: 10, shadowOpacity: 0.5, opacity: 0.8 },
+  clusterText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  pickedMarker: { backgroundColor: '#ef4444', padding: 10, borderRadius: 30, borderWidth: 3, borderColor: '#fff' },
+
+  // SIDEBAR STYLES
+  sidePanel: { position: 'absolute', top: 0, right: 0, bottom: 0, width: 450, zIndex: 2000, borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.1)' },
+  sidebarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 10 },
+  panelTitle: { fontSize: 24, fontWeight: '800', color: '#fff' },
+  sidebarSub: { color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: 4 },
+  clusterItem: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)', paddingBottom: 24 },
+  viewQuestBtn: { backgroundColor: '#7c3aed', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16, borderRadius: 14, marginTop: 16 },
+  viewQuestText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+
+  pickUI: { position: 'absolute', left: 20, right: 20, backgroundColor: 'rgba(15, 15, 15, 0.95)', padding: 24, borderRadius: 24, alignItems: 'center', zIndex: 150 },
+  pickTitle: { color: '#fff', fontWeight: 'bold', fontSize: 16, marginBottom: 15 },
+  confirmBtn: { backgroundColor: '#10b981', flexDirection: 'row', padding: 16, borderRadius: 12, width: '100%', justifyContent: 'center', gap: 8 },
+  confirmBtnText: { color: '#fff', fontWeight: 'bold' }
+});
