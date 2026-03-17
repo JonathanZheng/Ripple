@@ -9,20 +9,20 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import {
+  Map,
   Trophy,
   Layers,
   Plus,
   User,
-  Settings,
 } from 'lucide-react-native';
 import { useTheme } from '@/lib/ThemeContext';
 
 const TABS = [
-  { name: 'map',        label: 'Ranks',    icon: Trophy  },
-  { name: 'feed',       label: 'Feed',     icon: Layers  },
-  { name: 'post-quest', label: 'Post',     icon: Plus,   isAction: true },
-  { name: 'profile',    label: 'Profile',  icon: User    },
-  { name: 'settings',   label: 'Settings', icon: Settings },
+  { name: 'map',        label: 'Map',     icon: Map      },
+  { name: 'feed',       label: 'Feed',    icon: Layers   },
+  { name: 'post-quest', label: 'Post',    icon: Plus,    isAction: true },
+  { name: 'rank',       label: 'Rank',    icon: Trophy   },
+  { name: 'profile',    label: 'Profile', icon: User     },
 ];
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -151,7 +151,7 @@ function FloatingTabBar() {
             key={tab.name}
             tab={tab}
             isActive={activeTab === tab.name}
-            onPress={() => router.push(`/(tabs)/${tab.name}` as any)}
+            onPress={() => router.navigate(`/(tabs)/${tab.name}` as any)}
           />
         ))}
       </View>
@@ -178,8 +178,9 @@ export default function TabsLayout() {
         <Tabs.Screen name="map" />
         <Tabs.Screen name="feed" />
         <Tabs.Screen name="post-quest" />
+        <Tabs.Screen name="rank" />
         <Tabs.Screen name="profile" />
-        <Tabs.Screen name="settings" />
+        <Tabs.Screen name="settings" options={{ href: null }} />
       </Tabs>
       <FloatingTabBar />
     </View>

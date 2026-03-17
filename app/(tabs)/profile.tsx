@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Chip } from '@/components/ui/Chip';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { X, Plus, Flame, AlertTriangle, Layers } from 'lucide-react-native';
+import { X, Plus, Flame, AlertTriangle, Layers, Settings } from 'lucide-react-native';
 import { useTheme } from '@/lib/ThemeContext';
 import { Pressable } from 'react-native';
 import type { Profile, Quest } from '@/types/database';
@@ -104,7 +104,14 @@ export default function ProfileScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
-        <ScreenHeader title="Profile" />
+        <ScreenHeader
+          title="Profile"
+          rightAction={
+            <Pressable onPress={() => router.push('/(tabs)/settings')} hitSlop={12}>
+              <Settings size={20} color="rgba(255,255,255,0.60)" strokeWidth={1.8} />
+            </Pressable>
+          }
+        />
 
         {/* Profile hero */}
         <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
@@ -253,7 +260,7 @@ export default function ProfileScreen() {
               {tabQuests.map(quest => (
                 <Card
                   key={quest.id}
-                  onPress={() => router.push(`/quest/${quest.id}`)}
+                  onPress={() => router.push(`/quest/${quest.id}?from=profile`)}
                 >
                   {/* Tag color accent */}
                   <View style={{ position: 'absolute', left: 0, top: 16, bottom: 16, width: 3, borderRadius: 999, backgroundColor: (TAG_COLOURS as Record<string, string>)[quest.tag] ?? 'rgba(255,255,255,0.20)' }} />

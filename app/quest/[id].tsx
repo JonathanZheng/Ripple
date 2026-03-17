@@ -131,7 +131,7 @@ function StarPicker({ value, onChange }: { value: number; onChange: (n: number) 
 }
 
 export default function QuestDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const { session } = useSession();
   const userId = session?.user?.id;
   const insets = useSafeAreaInsets();
@@ -265,7 +265,8 @@ export default function QuestDetail() {
       setActionLoading(true);
       await supabase.from('quests').update({ status: 'expired' }).eq('id', quest.id);
       setActionLoading(false);
-      router.canGoBack() ? router.back() : router.replace('/(tabs)/feed');
+      const dest: Record<string, string> = { feed: '/(tabs)/feed', profile: '/(tabs)/profile' };
+      router.navigate((dest[from ?? ''] ?? '/(tabs)/feed') as any);
     }, 'Cancel Quest');
   };
 
@@ -279,7 +280,8 @@ export default function QuestDetail() {
       acceptorFetched.current = false;
       await supabase.from('quests').update({ status: 'open', acceptor_id: null }).eq('id', quest.id);
       setActionLoading(false);
-      router.canGoBack() ? router.back() : router.replace('/(tabs)/feed');
+      const dest: Record<string, string> = { feed: '/(tabs)/feed', profile: '/(tabs)/profile' };
+      router.navigate((dest[from ?? ''] ?? '/(tabs)/feed') as any);
     }, 'Drop Out');
   };
 
@@ -569,7 +571,7 @@ export default function QuestDetail() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
         <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '600', marginBottom: 16 }}>Quest not found</Text>
-        <Button variant="secondary" onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/feed')}>Go back</Button>
+        <Button variant="secondary" onPress={() => router.navigate('/(tabs)/feed' as any)}>Go back</Button>
       </View>
     );
   }
@@ -622,6 +624,13 @@ export default function QuestDetail() {
         backAction
         title={quest.ai_generated_title ?? quest.title}
         rightAction={<Badge variant="status" value={quest.status} />}
+        onBack={() => {
+          const dest: Record<string, string> = {
+            feed: '/(tabs)/feed',
+            profile: '/(tabs)/profile',
+          };
+          router.navigate((dest[from ?? ''] ?? '/(tabs)/feed') as any);
+        }}
       />
 
       {/* Tab switcher — only visible once quest is active */}

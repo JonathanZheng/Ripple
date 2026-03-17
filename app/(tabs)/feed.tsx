@@ -4,10 +4,16 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Pressable,
 } from 'react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
@@ -17,7 +23,16 @@ import { Chip } from '@/components/ui/Chip';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { useTheme } from '@/lib/ThemeContext';
 import { QUEST_TAGS, TAG_COLOURS } from '@/constants';
-import { Search, Layers } from 'lucide-react-native';
+import { Search, Layers, SlidersHorizontal } from 'lucide-react-native';
+import {
+  rankFeed,
+  isEligible,
+  initialSessionBoosts,
+  incrementSessionBoost,
+  type AcceptedQuestSummary,
+  type SessionTagBoosts,
+  type RankingContext,
+} from '@/lib/ranking';
 import type { Quest, QuestTag, FulfilmentMode } from '@/types/database';
 
 const MODE_OPTIONS: { value: FulfilmentMode | 'all'; label: string }[] = [
@@ -78,6 +93,8 @@ function deadlineInRange(deadline: string, filter: DeadlineFilter): boolean {
   }
 }
 
+const DROPDOWN_HEIGHT = 280;
+
 export default function Feed() {
   const insets = useSafeAreaInsets();
   const { session } = useSession();
@@ -93,6 +110,31 @@ export default function Feed() {
   const [rewardFilter, setRewardFilter] = useState<RewardFilter>('all');
   const [deadlineFilter, setDeadlineFilter] = useState<DeadlineFilter>('all');
   const [search, setSearch] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [acceptHistory, setAcceptHistory] = useState<AcceptedQuestSummary[]>([]);
+  const [sessionBoosts, setSessionBoosts] = useState<SessionTagBoosts>(initialSessionBoosts());
+  const [seenCounts, setSeenCounts] = useState<Map<string, number>>(new Map());
+
+  const dropdownHeight = useSharedValue(0);
+  const dropdownStyle = useAnimatedStyle(() => ({
+    maxHeight: dropdownHeight.value,
+    overflow: 'hidden',
+  }));
+
+  const toggleFilter = () => {
+    const next = !filterOpen;
+    setFilterOpen(next);
+    dropdownHeight.value = withTiming(next ? DROPDOWN_HEIGHT : 0, { duration: 250 });
+  };
+
+  const resetFilters = () => {
+    setTagFilter('all');
+    setModeFilter('all');
+    setQuestTypeFilter('all');
+    setRewardFilter('all');
+    setDeadlineFilter('all');
+    setSessionBoosts(initialSessionBoosts());
+  };
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -105,10 +147,25 @@ export default function Feed() {
     if (!error && data) setQuests(data as Quest[]);
   }
 
+  async function fetchHistory(userId: string): Promise<AcceptedQuestSummary[]> {
+    const { data } = await supabase
+      .from('quests')
+      .select('tag, created_at, location_name')
+      .eq('acceptor_id', userId)
+      .in('status', ['completed', 'in_progress'])
+      .order('created_at', { ascending: false })
+      .limit(50);
+    return (data ?? []) as AcceptedQuestSummary[];
+  }
+
   useFocusEffect(
     useCallback(() => {
-      fetchQuests().finally(() => setLoading(false));
-    }, []),
+      const userId = session?.user.id;
+      Promise.all([
+        fetchQuests(),
+        userId ? fetchHistory(userId).then(setAcceptHistory) : Promise.resolve(),
+      ]).finally(() => setLoading(false));
+    }, [session?.user.id]),
   );
 
   useEffect(() => {
@@ -128,10 +185,12 @@ export default function Feed() {
     setRefreshing(false);
   }
 
+  const userTier = profile?.trust_tier ?? 'wanderer';
   const now = new Date();
   const filtered = quests.filter((q) => {
     if (new Date(q.deadline) <= now) return false;
     if (q.is_flash && q.flash_expires_at && new Date(q.flash_expires_at) <= now) return false;
+    if (!q.is_flash && !isEligible(q, userTier)) return false;
     if (tagFilter !== 'all' && q.tag !== tagFilter) return false;
     if (modeFilter !== 'all' && q.fulfilment_mode !== modeFilter) return false;
     if (questTypeFilter !== 'all' && (q as any).quest_type !== questTypeFilter) return false;
@@ -145,100 +204,220 @@ export default function Feed() {
     return true;
   });
 
+  const activeFilterCount = [
+    tagFilter !== 'all',
+    modeFilter !== 'all',
+    questTypeFilter !== 'all',
+    rewardFilter !== 'all',
+    deadlineFilter !== 'all',
+  ].filter(Boolean).length;
+
   const hasExtraFilters = questTypeFilter !== 'all' || rewardFilter !== 'all' || deadlineFilter !== 'all';
-  const userTier = profile?.trust_tier ?? 'wanderer';
+
+  // Skip damper: quests seen 3+ times without a tap
+  const skippedQuestIds = useMemo(() => {
+    const s = new Set<string>();
+    seenCounts.forEach((count, id) => { if (count >= 3) s.add(id); });
+    return s;
+  }, [seenCounts]);
+
+  // Build ranking context
+  const rankingContext = useMemo<RankingContext | null>(() => {
+    if (!profile) return null;
+    return {
+      userRc: profile.rc,
+      tier: profile.trust_tier,
+      skills: profile.skills ?? [],
+      history: acceptHistory,
+      sessionBoosts,
+      skippedQuestIds,
+    };
+  }, [profile, acceptHistory, sessionBoosts, skippedQuestIds]);
+
+  // Apply ranking after filters
+  const { pinned, ranked } = useMemo(() => {
+    if (!rankingContext) {
+      return {
+        pinned: [],
+        ranked: filtered.map(q => ({ quest: q, score: 0, breakdown: {} as any })),
+      };
+    }
+    return rankFeed(filtered, rankingContext);
+  }, [filtered, rankingContext]);
+
+  const feedData = [...pinned, ...ranked.map(r => r.quest)];
+
+  const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
+    setSeenCounts(prev => {
+      const next = new Map(prev);
+      for (const { item } of viewableItems) {
+        next.set(item.id, (next.get(item.id) ?? 0) + 1);
+      }
+      return next;
+    });
+  }, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <FlatList
-        data={filtered}
+        data={feedData}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <QuestCard quest={item} userTier={userTier} />}
+        renderItem={({ item }) => <QuestCard quest={item} userTier={userTier} from="feed" />}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 100 }}
         showsVerticalScrollIndicator={false}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.textFaint} />
         }
         ListHeaderComponent={
           <View>
-            <ScreenHeader title="Quests" subtitle="Discover requests near you" />
-
-            {/* Search */}
-            <View style={{ paddingHorizontal: 4, marginBottom: 14 }}>
-              <Input
-                leftIcon={Search}
-                placeholder="Search quests..."
-                value={search}
-                onChangeText={setSearch}
-                returnKeyType="search"
-                rounded
-              />
-            </View>
-
-            {/* Tag filter */}
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={['all', ...QUEST_TAGS] as const}
-              keyExtractor={(item) => item}
-              contentContainerStyle={{ paddingHorizontal: 4, gap: 6, marginBottom: 8 }}
-              renderItem={({ item }) => (
-                <Chip
-                  label={item === 'all' ? 'All' : item.charAt(0).toUpperCase() + item.slice(1)}
-                  selected={tagFilter === item}
-                  color={item !== 'all' ? TAG_COLOURS[item] : undefined}
-                  onPress={() => setTagFilter(item as typeof tagFilter)}
-                />
-              )}
+            <ScreenHeader
+              title="Quests"
+              subtitle={acceptHistory.length > 0 ? 'Ranked for you' : 'Discover requests near you'}
             />
 
-            {/* Mode filter */}
-            <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 4, marginBottom: 8 }}>
-              {MODE_OPTIONS.map(({ value, label }) => (
-                <Chip
-                  key={value}
-                  label={label}
-                  selected={modeFilter === value}
-                  onPress={() => setModeFilter(value)}
+            {/* Search + filter button row */}
+            <View style={{ paddingHorizontal: 4, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ flex: 1 }}>
+                <Input
+                  leftIcon={Search}
+                  placeholder="Search quests..."
+                  value={search}
+                  onChangeText={setSearch}
+                  returnKeyType="search"
+                  rounded
                 />
-              ))}
+              </View>
+              <Pressable
+                onPress={toggleFilter}
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: filterOpen ? 'rgba(124,58,237,0.18)' : 'rgba(255,255,255,0.06)',
+                  borderWidth: 1,
+                  borderColor: filterOpen ? 'rgba(124,58,237,0.40)' : 'rgba(255,255,255,0.10)',
+                }}
+              >
+                <SlidersHorizontal size={18} color={filterOpen ? '#a78bfa' : 'rgba(255,255,255,0.70)'} strokeWidth={2} />
+                {activeFilterCount > 0 && (
+                  <View style={{
+                    position: 'absolute',
+                    top: 6,
+                    right: 6,
+                    width: 14,
+                    height: 14,
+                    borderRadius: 7,
+                    backgroundColor: '#7c3aed',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Text style={{ color: '#ffffff', fontSize: 9, fontWeight: '700' }}>
+                      {activeFilterCount}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
             </View>
 
-            {/* Quest type filter */}
-            <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 4, marginBottom: 8 }}>
-              {QUEST_TYPE_OPTIONS.map(({ value, label }) => (
-                <Chip
-                  key={value}
-                  label={label}
-                  selected={questTypeFilter === value}
-                  onPress={() => setQuestTypeFilter(value)}
-                />
-              ))}
-            </View>
+            {/* Animated filter dropdown */}
+            <Animated.View style={[dropdownStyle, { paddingHorizontal: 4, marginBottom: filterOpen ? 10 : 0 }]}>
+              <View style={{
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.08)',
+                borderRadius: 16,
+                padding: 16,
+                gap: 14,
+              }}>
+                {/* Tag filter */}
+                <View>
+                  <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 10, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8 }}>
+                    CATEGORY
+                  </Text>
+                  <FlatList
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    data={['all', ...QUEST_TAGS] as const}
+                    keyExtractor={(item) => item}
+                    contentContainerStyle={{ gap: 6 }}
+                    renderItem={({ item }) => (
+                      <Chip
+                        label={item === 'all' ? 'All' : item.charAt(0).toUpperCase() + item.slice(1)}
+                        selected={tagFilter === item}
+                        color={item !== 'all' ? TAG_COLOURS[item] : undefined}
+                        onPress={() => {
+                          setTagFilter(item as typeof tagFilter);
+                          if (item !== 'all') {
+                            setSessionBoosts(prev => incrementSessionBoost(prev, item as QuestTag));
+                          }
+                        }}
+                      />
+                    )}
+                  />
+                </View>
 
-            {/* Reward range filter */}
-            <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 4, marginBottom: 8 }}>
-              {REWARD_OPTIONS.map(({ value, label }) => (
-                <Chip
-                  key={value}
-                  label={label}
-                  selected={rewardFilter === value}
-                  onPress={() => setRewardFilter(value)}
-                />
-              ))}
-            </View>
+                {/* Mode filter */}
+                <View>
+                  <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 10, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8 }}>
+                    MODE
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                    {MODE_OPTIONS.map(({ value, label }) => (
+                      <Chip key={value} label={label} selected={modeFilter === value} onPress={() => setModeFilter(value)} />
+                    ))}
+                  </View>
+                </View>
 
-            {/* Deadline filter */}
-            <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 4, marginBottom: 16 }}>
-              {DEADLINE_OPTIONS.map(({ value, label }) => (
-                <Chip
-                  key={value}
-                  label={label}
-                  selected={deadlineFilter === value}
-                  onPress={() => setDeadlineFilter(value)}
-                />
-              ))}
-            </View>
+                {/* Quest type filter */}
+                <View>
+                  <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 10, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8 }}>
+                    TYPE
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                    {QUEST_TYPE_OPTIONS.map(({ value, label }) => (
+                      <Chip key={value} label={label} selected={questTypeFilter === value} onPress={() => setQuestTypeFilter(value)} />
+                    ))}
+                  </View>
+                </View>
+
+                {/* Reward + Deadline in one row */}
+                <View style={{ flexDirection: 'row', gap: 16 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 10, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8 }}>
+                      REWARD
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                      {REWARD_OPTIONS.map(({ value, label }) => (
+                        <Chip key={value} label={label} selected={rewardFilter === value} onPress={() => setRewardFilter(value)} />
+                      ))}
+                    </View>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 10, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8 }}>
+                      DEADLINE
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                      {DEADLINE_OPTIONS.map(({ value, label }) => (
+                        <Chip key={value} label={label} selected={deadlineFilter === value} onPress={() => setDeadlineFilter(value)} />
+                      ))}
+                    </View>
+                  </View>
+                </View>
+
+                {/* Reset button */}
+                {activeFilterCount > 0 && (
+                  <Pressable onPress={resetFilters} style={{ alignSelf: 'flex-end' }}>
+                    <Text style={{ color: 'rgba(255,255,255,0.40)', fontSize: 13, fontWeight: '500' }}>
+                      Reset filters
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+            </Animated.View>
           </View>
         }
         ListEmptyComponent={

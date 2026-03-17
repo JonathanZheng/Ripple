@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { formatDistanceToNow, isPast } from 'date-fns';
 import { TAG_COLOURS, TRUST_TIER_CONFIG } from '@/constants';
+import { isEligible, ineligibilityReason } from '@/lib/ranking';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -13,15 +14,9 @@ import type { Quest, TrustTier } from '@/types/database';
 interface Props {
   quest: Quest;
   userTier: TrustTier;
+  from?: string;
 }
 
-function canAccept(quest: Quest, tier: TrustTier): { ok: boolean; reason?: string } {
-  if (quest.tag === 'food' && tier === 'wanderer')
-    return { ok: false, reason: 'Explorer+ required for food quests' };
-  if (quest.reward_amount > 5 && tier === 'wanderer')
-    return { ok: false, reason: 'Explorer+ required for rewards > $5' };
-  return { ok: true };
-}
 
 function FlashCountdown({ expiresAt }: { expiresAt: string }) {
   const [now, setNow] = useState(() => new Date());
@@ -55,8 +50,9 @@ function FlashCountdown({ expiresAt }: { expiresAt: string }) {
   );
 }
 
-export function QuestCard({ quest, userTier }: Props) {
-  const eligibility = canAccept(quest, userTier);
+export function QuestCard({ quest, userTier, from }: Props) {
+  const eligible = isEligible(quest, userTier);
+  const ineligReason = ineligibilityReason(quest, userTier);
   const deadlineDate = new Date(quest.deadline);
   const expired = isPast(deadlineDate);
   const timeLeft = expired ? 'Expired' : `${formatDistanceToNow(deadlineDate)} left`;
@@ -75,10 +71,14 @@ export function QuestCard({ quest, userTier }: Props) {
 
   if (isFlashExpired || expired) return null;
 
+  const borderColor = quest.is_flash
+    ? '#f59e0b'
+    : (TAG_COLOURS as Record<string, string>)[quest.tag] ?? 'rgba(255,255,255,0.07)';
+
   return (
     <Card
-      onPress={() => router.push(`/quest/${quest.id}`)}
-      style={{ marginBottom: 10, opacity: eligibility.ok ? 1 : 0.55 }}
+      onPress={() => router.push(`/quest/${quest.id}${from ? `?from=${from}` : ''}`)}
+      style={{ marginBottom: 10, opacity: eligible ? 1 : 0.55, borderColor, borderWidth: 1.5 }}
     >
       {/* Flash countdown */}
       {quest.is_flash && flashExpiresAt && (
@@ -186,7 +186,7 @@ export function QuestCard({ quest, userTier }: Props) {
       </View>
 
       {/* Ineligibility notice */}
-      {!eligibility.ok && (
+      {!eligible && ineligReason && (
         <View
           style={{
             marginTop: 12,
@@ -199,7 +199,7 @@ export function QuestCard({ quest, userTier }: Props) {
           }}
         >
           <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '500' }}>
-            {eligibility.reason} — you are {tierConfig.label}
+            {ineligReason} — you are {tierConfig.label}
           </Text>
         </View>
       )}

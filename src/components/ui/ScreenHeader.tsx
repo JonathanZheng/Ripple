@@ -10,9 +10,10 @@ interface ScreenHeaderProps {
   subtitle?: string;
   rightAction?: React.ReactNode;
   backAction?: boolean;
+  onBack?: () => void;
 }
 
-export function ScreenHeader({ title, subtitle, rightAction, backAction }: ScreenHeaderProps) {
+export function ScreenHeader({ title, subtitle, rightAction, backAction, onBack }: ScreenHeaderProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors } = useTheme();
@@ -31,7 +32,7 @@ export function ScreenHeader({ title, subtitle, rightAction, backAction }: Scree
       <View style={{ flex: 1 }}>
         {backAction && (
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => onBack ? onBack() : router.back()}
             style={{ marginBottom: 8, alignSelf: 'flex-start', padding: 4, marginLeft: -4 }}
             hitSlop={12}
           >

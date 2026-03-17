@@ -7,7 +7,8 @@ import {
   Platform,
   Pressable,
 } from 'react-native';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import Animated, {
   useSharedValue,
@@ -188,6 +189,20 @@ export default function PostQuest() {
   const [animatingDone, setAnimatingDone] = useState(true);
 
   const scrollRef = useRef<ScrollView>(null);
+  const shouldReset = useRef(false);
+
+  useFocusEffect(useCallback(() => {
+    if (!shouldReset.current) return;
+    shouldReset.current = false;
+    setTitle(''); setDescription(''); setTag(''); setMode('meetup');
+    setReward(''); setDeadlineLabel(''); setLocationName('UTown, NUS');
+    setIsFlash(false); setQuestType('standard'); setMaxAcceptors(2);
+    setStep('Details'); setError('');
+    setChatMessages([{ id: nextId(), role: 'assistant', content: GREETING }]);
+    setCollectedFields({}); setChatLoading(false); setQuestReady(false);
+    setChatInput(''); setPendingReply(null); setPendingComplete(false);
+    setAnimatingText(''); setAnimatingDone(true);
+  }, []));
 
   // ── Shared form state ──────────────────────────────────────────────────────
   const [title, setTitle] = useState('');
@@ -305,7 +320,7 @@ export default function PostQuest() {
   // ─── Manual: Submit ────────────────────────────────────────────────────────
   async function handleSubmit() {
     if (!title.trim()) { setError('Quest title is required.'); return; }
-    if (!description.trim() || description.length < 20) { setError('Description must be at least 20 characters.'); return; }
+    if (!description.trim() || description.length < 10) { setError('Description must be at least 10 characters.'); return; }
     if (!deadlineLabel) { setError('Please select a deadline.'); return; }
     const deadlineDate = buildDeadlineFromLabel(deadlineLabel as DeadlineLabel);
     if (deadlineDate <= new Date()) { setError('Deadline must be in the future.'); return; }
@@ -332,7 +347,7 @@ export default function PostQuest() {
         .select('id').single();
       if (insertError || !quest) { setError(insertError?.message ?? 'Failed to create quest.'); return; }
       supabase.functions.invoke('process-quest', { body: { quest_id: quest.id } });
-      resetForm(); resetAiChat();
+      shouldReset.current = true;
       router.replace('/(tabs)/feed');
     } catch (e: any) {
       setError(e?.message ?? 'Something went wrong.');
@@ -347,7 +362,7 @@ export default function PostQuest() {
     deadline_label: DeadlineLabel; location_name: string;
   }) {
     if (!fields.title.trim()) { setError('Quest title is required.'); return; }
-    if (!fields.description.trim() || fields.description.length < 20) { setError('Description must be at least 20 characters.'); return; }
+    if (!fields.description.trim() || fields.description.length < 10) { setError('Description must be at least 10 characters.'); return; }
     if (!fields.deadline_label) { setError('Please select a deadline.'); return; }
     const deadlineDate = buildDeadlineFromLabel(fields.deadline_label);
     if (deadlineDate <= new Date()) { setError('Deadline must be in the future.'); return; }
@@ -372,7 +387,7 @@ export default function PostQuest() {
         .select('id').single();
       if (insertError || !quest) { setError(insertError?.message ?? 'Failed to create quest.'); return; }
       supabase.functions.invoke('process-quest', { body: { quest_id: quest.id } });
-      resetForm(); resetAiChat();
+      shouldReset.current = true;
       router.replace('/(tabs)/feed');
     } catch (e: any) {
       setError(e?.message ?? 'Something went wrong.');
@@ -383,7 +398,7 @@ export default function PostQuest() {
 
   function validateDetails() {
     if (!title.trim()) return 'Quest title is required.';
-    if (!description.trim() || description.length < 20) return 'Description must be at least 20 characters.';
+    if (!description.trim() || description.length < 10) return 'Description must be at least 10 characters.';
     return null;
   }
 

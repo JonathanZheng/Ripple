@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
+import { Pressable, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
 import Animated, {
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { LucideIcon } from 'lucide-react-native';
+import { Eye, EyeOff, LucideIcon } from 'lucide-react-native';
 import { useTheme } from '@/lib/ThemeContext';
 
 interface InputProps extends TextInputProps {
@@ -30,6 +30,8 @@ export function Input({
   ...textInputProps
 }: InputProps) {
   const [focused, setFocused] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const isPasswordField = textInputProps.secureTextEntry === true;
   const focusAnim = useSharedValue(0);
   const { colors } = useTheme();
 
@@ -93,6 +95,7 @@ export function Input({
         )}
         <TextInput
           {...textInputProps}
+          secureTextEntry={isPasswordField ? !passwordVisible : false}
           onFocus={handleFocus}
           onBlur={handleBlur}
           placeholderTextColor={colors.inputPlaceholder}
@@ -107,9 +110,16 @@ export function Input({
             textInputProps.style,
           ]}
         />
-        {RightIcon && (
+        {isPasswordField ? (
+          <Pressable onPress={() => setPasswordVisible(v => !v)} hitSlop={8}>
+            {passwordVisible
+              ? <EyeOff size={17} color={colors.inputIcon} strokeWidth={2} />
+              : <Eye size={17} color={colors.inputIcon} strokeWidth={2} />
+            }
+          </Pressable>
+        ) : RightIcon ? (
           <RightIcon size={17} color={colors.inputIcon} strokeWidth={2} />
-        )}
+        ) : null}
       </Animated.View>
       {error && (
         <Text
