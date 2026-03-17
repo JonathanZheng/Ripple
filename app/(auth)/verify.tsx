@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/Button';
 import { ChevronLeft, Mail } from 'lucide-react-native';
 import { useTheme } from '@/lib/ThemeContext';
 
-const OTP_LENGTH = 6;
+const OTP_LENGTH = 8;
 
 export default function Verify() {
   const { colors } = useTheme();
   const { email } = useLocalSearchParams<{ email: string }>();
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otp, setOtp] = useState(['', '', '', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [error, setError] = useState('');
@@ -133,7 +133,7 @@ export default function Verify() {
       </View>
 
       {/* OTP boxes */}
-      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 28 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 28 }}>
         {otp.map((digit, i) => (
           <TextInput
             key={i}
@@ -145,8 +145,8 @@ export default function Verify() {
             maxLength={1}
             selectTextOnFocus
             style={{
-              width: 46,
-              height: 56,
+              width: 38,
+              height: 50,
               borderRadius: 14,
               borderWidth: 1.5,
               borderColor: digit ? '#7c3aed' : colors.border,
