@@ -8,13 +8,14 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { useTheme } from '@/lib/ThemeContext';
-import { Zap, Clock, MapPin, Users } from 'lucide-react-native';
+import { Zap, Clock, MapPin, Users, Navigation2 } from 'lucide-react-native';
 import type { Quest, TrustTier } from '@/types/database';
 
 interface Props {
   quest: Quest;
   userTier: TrustTier;
   from?: string;
+  isOnYourWay?: boolean;
 }
 
 
@@ -50,7 +51,7 @@ function FlashCountdown({ expiresAt }: { expiresAt: string }) {
   );
 }
 
-export function QuestCard({ quest, userTier, from }: Props) {
+export function QuestCard({ quest, userTier, from, isOnYourWay }: Props) {
   const eligible = isEligible(quest, userTier);
   const ineligReason = ineligibilityReason(quest, userTier);
   const deadlineDate = new Date(quest.deadline);
@@ -117,6 +118,22 @@ export function QuestCard({ quest, userTier, from }: Props) {
             <Text style={{ color: '#60a5fa', fontSize: 11, fontWeight: '600' }}>
               Crew ({maxAcceptors ?? 2} slots)
             </Text>
+          </View>
+        )}
+        {isOnYourWay && (
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            backgroundColor: 'rgba(59,130,246,0.12)',
+            borderWidth: 1,
+            borderColor: 'rgba(59,130,246,0.30)',
+            borderRadius: 999,
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+          }}>
+            <Navigation2 size={10} color="#3b82f6" strokeWidth={2} />
+            <Text style={{ color: '#3b82f6', fontSize: 11, fontWeight: '600' }}>On your way</Text>
           </View>
         )}
         {quest.location_name && (

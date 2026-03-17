@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Pressable,
+  LayoutChangeEvent,
 } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
@@ -13,17 +14,22 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  Easing,
 } from 'react-native-reanimated';
+
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
+import { useRouteOffer } from '@/hooks/useRouteOffer';
 import { QuestCard } from '@/components/QuestCard';
+import { RouteOfferBanner } from '@/components/RouteOfferBanner';
+import { RouteOfferCard, type RouteOfferWithProfile } from '@/components/RouteOfferCard';
 import { Input } from '@/components/ui/Input';
 import { Chip } from '@/components/ui/Chip';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { useTheme } from '@/lib/ThemeContext';
-import { QUEST_TAGS, TAG_COLOURS } from '@/constants';
-import { Search, Layers, SlidersHorizontal } from 'lucide-react-native';
+import { QUEST_TAGS, TAG_COLOURS, ROUTE_OFFER_RADIUS_DEG } from '@/constants';
+import { Search, Layers, SlidersHorizontal, Navigation2 } from 'lucide-react-native';
 import {
   rankFeed,
   isEligible,
@@ -94,6 +100,7 @@ function deadlineInRange(deadline: string, filter: DeadlineFilter): boolean {
 }
 
 const DROPDOWN_HEIGHT = 280;
+const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 50 };
 
 export default function Feed() {
   const insets = useSafeAreaInsets();
@@ -111,6 +118,37 @@ export default function Feed() {
   const [deadlineFilter, setDeadlineFilter] = useState<DeadlineFilter>('all');
   const [search, setSearch] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
+  const { activeOffer, cancelOffer } = useRouteOffer(session?.user?.id);
+
+  // Feed mode toggle + animated pill
+  const [feedMode, setFeedMode] = useState<'quests' | 'broadcast'>('quests');
+  const [routeOffers, setRouteOffers] = useState<RouteOfferWithProfile[]>([]);
+  const [loadingBroadcast, setLoadingBroadcast] = useState(false);
+  // Broadcast filters
+  const [broadcastTagFilter, setBroadcastTagFilter] = useState<QuestTag | 'all'>('all');
+  const [broadcastSearch, setBroadcastSearch] = useState('');
+  const [broadcastFilterOpen, setBroadcastFilterOpen] = useState(false);
+  const broadcastDropdownHeight = useSharedValue(0);
+  const broadcastDropdownStyle = useAnimatedStyle(() => ({
+    maxHeight: broadcastDropdownHeight.value,
+    overflow: 'hidden',
+  }));
+  const toggleBroadcastFilter = () => {
+    const next = !broadcastFilterOpen;
+    setBroadcastFilterOpen(next);
+    broadcastDropdownHeight.value = withTiming(next ? 120 : 0, { duration: 250 });
+  };
+  const feedPill = useSharedValue(0);
+  const [feedTabWidth, setFeedTabWidth] = useState(0);
+  const FEED_SLIDE = { duration: 220, easing: Easing.out(Easing.cubic) };
+  const feedPillStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: feedPill.value * (feedTabWidth / 2) }],
+  }));
+  function switchFeedMode(mode: 'quests' | 'broadcast') {
+    feedPill.value = withTiming(mode === 'quests' ? 0 : 1, FEED_SLIDE);
+    setFeedMode(mode);
+  }
+
   const [acceptHistory, setAcceptHistory] = useState<AcceptedQuestSummary[]>([]);
   const [sessionBoosts, setSessionBoosts] = useState<SessionTagBoosts>(initialSessionBoosts());
   const [seenCounts, setSeenCounts] = useState<Map<string, number>>(new Map());
@@ -179,18 +217,41 @@ export default function Feed() {
     return () => { channelRef.current?.unsubscribe(); };
   }, []);
 
+  useEffect(() => {
+    if (feedMode !== 'broadcast') return;
+    loadBroadcast();
+  }, [feedMode]);
+
+  async function loadBroadcast() {
+    setLoadingBroadcast(true);
+    const { data } = await supabase
+      .from('route_offers')
+      .select('*, profiles(id, display_name, rc, trust_tier, avg_rating, avatar_url)')
+      .eq('is_active', true)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false });
+    if (data) setRouteOffers(data as RouteOfferWithProfile[]);
+    setLoadingBroadcast(false);
+  }
+
   async function onRefresh() {
     setRefreshing(true);
-    await fetchQuests();
+    if (feedMode === 'broadcast') {
+      await loadBroadcast();
+    } else {
+      await fetchQuests();
+    }
     setRefreshing(false);
   }
 
   const userTier = profile?.trust_tier ?? 'wanderer';
+  const userId = session?.user?.id;
   const now = new Date();
   const filtered = quests.filter((q) => {
     if (new Date(q.deadline) <= now) return false;
     if (q.is_flash && q.flash_expires_at && new Date(q.flash_expires_at) <= now) return false;
-    if (!q.is_flash && !isEligible(q, userTier)) return false;
+    // Always show the poster's own quests regardless of tier eligibility
+    if (!q.is_flash && q.poster_id !== userId && !isEligible(q, userTier)) return false;
     if (tagFilter !== 'all' && q.tag !== tagFilter) return false;
     if (modeFilter !== 'all' && q.fulfilment_mode !== modeFilter) return false;
     if (questTypeFilter !== 'all' && (q as any).quest_type !== questTypeFilter) return false;
@@ -247,6 +308,17 @@ export default function Feed() {
 
   const feedData = [...pinned, ...ranked.map(r => r.quest)];
 
+  const onYourWayIds = useMemo((): Set<string> => {
+    if (!activeOffer) return new Set();
+    return new Set(
+      filtered.filter(q =>
+        q.latitude != null && q.longitude != null &&
+        Math.abs(q.latitude  - activeOffer.latitude)  <= ROUTE_OFFER_RADIUS_DEG &&
+        Math.abs(q.longitude - activeOffer.longitude) <= ROUTE_OFFER_RADIUS_DEG
+      ).map(q => q.id)
+    );
+  }, [filtered, activeOffer]);
+
   const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
     setSeenCounts(prev => {
       const next = new Map(prev);
@@ -257,25 +329,181 @@ export default function Feed() {
     });
   }, []);
 
+  // Shared header rendered above both FlatLists
+  const sharedHeader = (
+    <View>
+      <ScreenHeader
+        title="Quests"
+        subtitle={
+          feedMode === 'broadcast'
+            ? 'People heading out near UTown'
+            : acceptHistory.length > 0
+            ? 'Ranked for you'
+            : 'Discover requests near you'
+        }
+      />
+
+      {/* Quests / Scouts toggle — animated sliding pill */}
+      <View
+        onLayout={(e: LayoutChangeEvent) => setFeedTabWidth(e.nativeEvent.layout.width)}
+        style={{
+          flexDirection: 'row',
+          marginHorizontal: 4,
+          marginBottom: 14,
+          backgroundColor: 'rgba(255,255,255,0.04)',
+          borderRadius: 14,
+          padding: 4,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.07)',
+          position: 'relative',
+        }}
+      >
+        {/* Sliding white pill */}
+        {feedTabWidth > 0 && (
+          <Animated.View
+            style={[
+              {
+                position: 'absolute',
+                top: 4,
+                bottom: 4,
+                left: 4,
+                width: (feedTabWidth - 8) / 2,
+                backgroundColor: '#ffffff',
+                borderRadius: 10,
+              },
+              feedPillStyle,
+            ]}
+          />
+        )}
+        {([
+          { mode: 'quests' as const, label: 'Quests' },
+          { mode: 'broadcast' as const, label: 'Broadcast' },
+        ] as const).map(({ mode, label }) => (
+          <Pressable
+            key={mode}
+            onPress={() => switchFeedMode(mode)}
+            style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, zIndex: 1 }}
+          >
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: '700',
+                color: feedMode === mode ? '#000000' : 'rgba(255,255,255,0.40)',
+              }}
+            >
+              {label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {/* Route offer banner (quests mode only) */}
+      {feedMode === 'quests' && activeOffer && (
+        <RouteOfferBanner offer={activeOffer} onCancel={cancelOffer} />
+      )}
+
+      {/* Broadcast filters */}
+      {feedMode === 'broadcast' && (
+        <View style={{ paddingHorizontal: 4, marginBottom: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Input
+                leftIcon={Search}
+                placeholder="Search by destination…"
+                value={broadcastSearch}
+                onChangeText={setBroadcastSearch}
+                returnKeyType="search"
+                rounded
+              />
+            </View>
+            <Pressable
+              onPress={toggleBroadcastFilter}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 14,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: broadcastFilterOpen ? 'rgba(124,58,237,0.18)' : 'rgba(255,255,255,0.06)',
+                borderWidth: 1,
+                borderColor: broadcastFilterOpen ? 'rgba(124,58,237,0.40)' : 'rgba(255,255,255,0.10)',
+              }}
+            >
+              <SlidersHorizontal size={18} color={broadcastFilterOpen ? '#a78bfa' : 'rgba(255,255,255,0.70)'} strokeWidth={2} />
+              {broadcastTagFilter !== 'all' && (
+                <View style={{
+                  position: 'absolute', top: 6, right: 6,
+                  width: 14, height: 14, borderRadius: 7,
+                  backgroundColor: '#7c3aed',
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>1</Text>
+                </View>
+              )}
+            </Pressable>
+          </View>
+
+          <Animated.View style={[broadcastDropdownStyle, { paddingHorizontal: 0, marginBottom: broadcastFilterOpen ? 10 : 0 }]}>
+            <View style={{
+              backgroundColor: 'rgba(255,255,255,0.04)',
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.08)',
+              borderRadius: 16,
+              padding: 16,
+              gap: 14,
+            }}>
+              <View>
+                <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 10, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8 }}>
+                  CAN HELP WITH
+                </Text>
+                <FlatList
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  data={(['all', ...QUEST_TAGS] as (QuestTag | 'all')[])}
+                  keyExtractor={(item) => item}
+                  contentContainerStyle={{ gap: 6 }}
+                  renderItem={({ item }) => (
+                    <Chip
+                      label={item === 'all' ? 'Any' : item.charAt(0).toUpperCase() + item.slice(1)}
+                      selected={broadcastTagFilter === item}
+                      color={item !== 'all' ? TAG_COLOURS[item] : undefined}
+                      onPress={() => setBroadcastTagFilter(item as typeof broadcastTagFilter)}
+                    />
+                  )}
+                />
+              </View>
+            </View>
+          </Animated.View>
+        </View>
+      )}
+    </View>
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <FlatList
-        data={feedData}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <QuestCard quest={item} userTier={userTier} from="feed" />}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 100 }}
-        showsVerticalScrollIndicator={false}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.textFaint} />
-        }
-        ListHeaderComponent={
-          <View>
-            <ScreenHeader
-              title="Quests"
-              subtitle={acceptHistory.length > 0 ? 'Ranked for you' : 'Discover requests near you'}
+      {feedMode === 'quests' ? (
+        <FlatList
+          key="quests-list"
+          data={feedData}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <QuestCard
+              quest={item}
+              userTier={userTier}
+              from="feed"
+              isOnYourWay={onYourWayIds.has(item.id)}
             />
+          )}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 100 }}
+          showsVerticalScrollIndicator={false}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={VIEWABILITY_CONFIG}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.textFaint} />
+          }
+          ListHeaderComponent={
+            <View>
+              {sharedHeader}
 
             {/* Search + filter button row */}
             <View style={{ paddingHorizontal: 4, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -440,6 +668,51 @@ export default function Feed() {
           )
         }
       />
+      ) : (
+        /* ── Broadcast feed ───────────────────────────── */
+        <FlatList
+          key="broadcast-list"
+          data={routeOffers.filter((o) => {
+            if (o.profiles?.id === session?.user?.id) return false;
+            if (broadcastTagFilter !== 'all') {
+              if (!o.tags || o.tags.length === 0) return true; // "can help with anything"
+              if (!o.tags.includes(broadcastTagFilter)) return false;
+            }
+            if (broadcastSearch.trim()) {
+              const s = broadcastSearch.toLowerCase();
+              if (!o.destination_name.toLowerCase().includes(s)) return false;
+            }
+            return true;
+          })}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 100 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.textFaint} />
+          }
+          ListHeaderComponent={<View>{sharedHeader}</View>}
+          ListEmptyComponent={
+            loadingBroadcast ? (
+              <View style={{ alignItems: 'center', paddingTop: 80 }}>
+                <ActivityIndicator color={colors.textFaint} size="large" />
+              </View>
+            ) : (
+              <View style={{ alignItems: 'center', paddingTop: 60, paddingHorizontal: 24 }}>
+                <Navigation2 size={48} color={colors.textFaint} strokeWidth={1.5} />
+                <Text style={{ color: colors.text, fontWeight: '600', fontSize: 16, marginTop: 16, letterSpacing: -0.3 }}>
+                  No broadcasts right now
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 14, marginTop: 6, textAlign: 'center', lineHeight: 20 }}>
+                  Be the first — tap "Going out?" on the map
+                </Text>
+              </View>
+            )
+          }
+          renderItem={({ item }) => (
+            <RouteOfferCard offer={item} currentUserId={session?.user?.id} />
+          )}
+        />
+      )}
     </View>
   );
 }

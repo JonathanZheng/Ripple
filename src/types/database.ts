@@ -2,6 +2,31 @@
 // Replace with: npx supabase gen types typescript --project-id <id> > types/database.ts
 
 export type TrustTier = 'wanderer' | 'explorer' | 'champion';
+
+export interface RouteOffer {
+  id: string;
+  user_id: string;
+  destination_name: string;
+  latitude: number;
+  longitude: number;
+  geohash: string;
+  tags: string[];
+  note: string | null;
+  expires_at: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface RouteOfferInsert {
+  user_id: string;
+  destination_name: string;
+  latitude: number;
+  longitude: number;
+  geohash: string;
+  tags?: string[];
+  note?: string | null;
+  expires_at: string;
+}
 export type QuestStatus = 'open' | 'in_progress' | 'completed' | 'expired' | 'disputed';
 export type QuestTag = 'food' | 'transport' | 'social' | 'skills' | 'errands';
 export type FulfilmentMode = 'meetup' | 'dropoff';
@@ -18,6 +43,7 @@ export interface NotificationPreferences {
   quest_completed?: boolean;
   chat_messages?: boolean;
   flash_quests?: boolean;
+  route_offer_matches?: boolean;
   frequency?: 'instant' | 'hourly' | 'off';
 }
 
@@ -110,6 +136,14 @@ export interface CrewMember {
   user_id: string;
   joined_at: string;
   status: CrewMemberStatus;
+}
+
+export interface DirectMessage {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  content: string;
+  created_at: string;
 }
 
 export interface Report {

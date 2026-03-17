@@ -15,9 +15,10 @@ import { Badge } from '@/components/ui/Badge';
 import { Chip } from '@/components/ui/Chip';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { X, Plus, Flame, AlertTriangle, Layers, Settings } from 'lucide-react-native';
+import { X, Plus, Flame, AlertTriangle, Layers, Settings, Navigation2 } from 'lucide-react-native';
 import { useTheme } from '@/lib/ThemeContext';
 import { Pressable } from 'react-native';
+import { useRouteOffer } from '@/hooks/useRouteOffer';
 import type { Profile, Quest } from '@/types/database';
 
 type Tab = 'posted' | 'inprogress' | 'completed';
@@ -32,6 +33,7 @@ export default function ProfileScreen() {
   const { session } = useSession();
   const userId = session?.user?.id;
   const insets = useSafeAreaInsets();
+  const { activeOffer, cancelOffer } = useRouteOffer(userId);
 
   const { colors } = useTheme();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -200,6 +202,35 @@ export default function ProfileScreen() {
                 <Text style={{ color: 'rgba(239,68,68,0.70)', fontSize: 13 }}>
                   {profile.strikes >= 3 ? 'Account under review' : `${3 - profile.strikes} more until review`}
                 </Text>
+              </View>
+            </Card>
+          </View>
+        )}
+
+        {/* Active route offer */}
+        {activeOffer && (
+          <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+            <Card style={{ backgroundColor: 'rgba(59,130,246,0.06)', borderColor: 'rgba(59,130,246,0.22)' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(59,130,246,0.15)', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
+                  <Navigation2 size={15} color="#3b82f6" strokeWidth={2.5} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#3b82f6', fontWeight: '700', fontSize: 14, marginBottom: 2 }}>
+                    Heading to {activeOffer.destination_name}
+                  </Text>
+                  <Text style={{ color: 'rgba(59,130,246,0.60)', fontSize: 12 }}>
+                    Active until {new Date(activeOffer.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                  {activeOffer.note ? (
+                    <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, marginTop: 4 }}>
+                      {activeOffer.note}
+                    </Text>
+                  ) : null}
+                </View>
+                <Pressable onPress={cancelOffer} hitSlop={10}>
+                  <X size={16} color="rgba(59,130,246,0.50)" strokeWidth={2.5} />
+                </Pressable>
               </View>
             </Card>
           </View>

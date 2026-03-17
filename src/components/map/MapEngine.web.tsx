@@ -1,106 +1,62 @@
 import { View, Text } from 'react-native';
 import { Map, Marker } from 'pigeon-maps';
-import { MapPin } from 'lucide-react-native';
-import { TAG_COLOURS } from '@/constants';
-import type { Quest } from '@/types/database';
+import type { LocationMarker, MapEngineProps } from './MapEngine';
 
-export interface MapEngineProps {
-  clusters: Quest[][];
-  isPickingMode: boolean;
-  pickedLocation: [number, number] | null;
-  onClusterPress: (quests: Quest[]) => void;
-  onMapPress: (lat: number, lon: number) => void;
-}
+export type { LocationMarker, MapEngineProps };
 
-export default function MapEngine({
-  clusters,
-  isPickingMode,
-  pickedLocation,
-  onClusterPress,
-  onMapPress,
-}: MapEngineProps) {
+export default function MapEngine({ locationMarkers, onLocationPress }: MapEngineProps) {
   return (
     <View style={{ flex: 1 }}>
       <Map
         defaultCenter={[1.3063, 103.7733]}
         defaultZoom={15}
-        onClick={({ latLng }) => onMapPress(latLng[0], latLng[1])}
         boxClassname="map-dark-mode"
       >
-        {!isPickingMode &&
-          clusters.map((clusterQuests) => {
-            const first = clusterQuests[0];
-            const count = clusterQuests.length;
-            const isCluster = count > 1;
-
-            return (
-              <Marker
-                key={first.id}
-                width={isCluster ? 50 : 40}
-                anchor={[first.latitude!, first.longitude!]}
-              >
-                <div
-                  style={{ cursor: 'pointer', pointerEvents: 'auto' }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onClusterPress(clusterQuests);
-                  }}
-                >
-                  {isCluster ? (
-                    <View
-                      style={{
-                        backgroundColor: '#7c3aed',
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
-                        borderWidth: 3,
-                        borderColor: '#fff',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
-                        {count}
-                      </Text>
-                    </View>
-                  ) : (
-                    <View
-                      style={{
-                        padding: 8,
-                        borderRadius: 20,
-                        borderWidth: 2,
-                        borderColor: '#fff',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: TAG_COLOURS[first.tag] || '#7c3aed',
-                        opacity: 0.85,
-                      }}
-                    >
-                      <MapPin size={18} color="#fff" />
-                    </View>
-                  )}
-                </div>
-              </Marker>
-            );
-          })}
-
-        {isPickingMode && pickedLocation && (
-          <Marker anchor={pickedLocation} width={40}>
-            <View
-              style={{
-                backgroundColor: '#ef4444',
-                padding: 10,
-                borderRadius: 30,
-                borderWidth: 3,
-                borderColor: '#fff',
-                alignItems: 'center',
-                justifyContent: 'center',
+        {locationMarkers.map((marker) => (
+          <Marker
+            key={marker.name}
+            width={marker.quests.length > 0 ? 40 : 14}
+            anchor={[marker.latitude, marker.longitude]}
+          >
+            <div
+              style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onLocationPress(marker);
               }}
             >
-              <MapPin size={24} color="#fff" />
-            </View>
+              {marker.quests.length > 0 ? (
+                <View
+                  style={{
+                    backgroundColor: '#7c3aed',
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    borderWidth: 2.5,
+                    borderColor: '#fff',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>
+                    {marker.quests.length}
+                  </Text>
+                </View>
+              ) : (
+                <View
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: 5,
+                    backgroundColor: 'rgba(255,255,255,0.20)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.35)',
+                  }}
+                />
+              )}
+            </div>
           </Marker>
-        )}
+        ))}
       </Map>
 
       <style>{`

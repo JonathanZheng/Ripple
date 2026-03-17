@@ -76,7 +76,31 @@ Given a quest title and description, return a JSON object with:
     const updatePayload: Record<string, unknown> = { tag, ai_generated_title: ai_title };
     if (embedding) updatePayload.embedding = embedding;
 
-    await supabase.from('quests').update(updatePayload).eq('id', quest_id);
+    const { data: updatedQuest } = await supabase
+      .from('quests')
+      .update(updatePayload)
+      .eq('id', quest_id)
+      .select('latitude, longitude, title')
+      .single();
+
+    // 4. Notify helpers with a nearby route offer (fire-and-forget)
+    if (updatedQuest?.latitude && updatedQuest?.longitude) {
+      const notifyUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/notify-route-offers`;
+      fetch(notifyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({
+          quest_id,
+          quest_lat: updatedQuest.latitude,
+          quest_lng: updatedQuest.longitude,
+          quest_title: updatedQuest.title ?? ai_title,
+          quest_tag: tag,
+        }),
+      }).catch((e) => console.error('notify-route-offers invoke failed:', e));
+    }
 
     return new Response(
       JSON.stringify({ tag, ai_title, suggested_price_min, suggested_price_max }),

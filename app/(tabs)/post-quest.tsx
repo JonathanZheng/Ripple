@@ -6,14 +6,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  TouchableOpacity,
+  TextInput,
 } from 'react-native';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
   withRepeat,
   withSequence,
   withTiming,
@@ -23,7 +24,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { encodeGeohash } from '@/lib/geohash';
-import { QUEST_TAGS, TAG_COLOURS } from '@/constants';
+import { QUEST_TAGS, TAG_COLOURS, NUS_LOCATIONS } from '@/constants';
 import { useTheme } from '@/lib/ThemeContext';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Card } from '@/components/ui/Card';
@@ -32,7 +33,7 @@ import { Input } from '@/components/ui/Input';
 import { Chip } from '@/components/ui/Chip';
 import { Badge } from '@/components/ui/Badge';
 import { StepIndicator } from '@/components/ui/StepIndicator';
-import { Users, Package, Send, Zap, MapPin } from 'lucide-react-native';
+import { Users, Package, Send, Zap, MapPin, X, Search } from 'lucide-react-native';
 import type { QuestTag, FulfilmentMode } from '@/types/database';
 
 // NUS UTown rough centre
@@ -45,10 +46,6 @@ type Step = (typeof STEPS)[number];
 const DEADLINE_LABELS = ['1 hour', '3 hours', 'Tonight (10 PM)', 'Tomorrow noon'] as const;
 type DeadlineLabel = (typeof DEADLINE_LABELS)[number];
 
-const RC_LOCATIONS = [
-  'Tembusu College', 'CAPT', 'RC4', 'RVRC', 'Acacia', 'NUSC', 'UTR',
-  'The Deck', 'Frontier', 'Fine Food', 'UTown Green', 'Stephen Riady Centre',
-];
 
 function buildDeadlineFromLabel(label: DeadlineLabel): Date {
   switch (label) {
@@ -179,7 +176,6 @@ function ModeToggle({ value, onChange }: { value: 'ai' | 'manual'; onChange: (m:
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function PostQuest() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ lat?: string; lon?: string }>();
   const [postMode, setPostMode] = useState<'ai' | 'manual'>('ai');
 
   // ── AI chat state ──────────────────────────────────────────────────────────
@@ -198,19 +194,12 @@ export default function PostQuest() {
   const scrollRef = useRef<ScrollView>(null);
   const shouldReset = useRef(false);
 
-  // Pick up lat/lon when returning from map picker
-  useFocusEffect(useCallback(() => {
-    if (params.lat && params.lon) {
-      setPickedLat(parseFloat(params.lat));
-      setPickedLon(parseFloat(params.lon));
-    }
-  }, [params.lat, params.lon]));
-
   useFocusEffect(useCallback(() => {
     if (!shouldReset.current) return;
     shouldReset.current = false;
     setTitle(''); setDescription(''); setTag(''); setMode('meetup');
-    setReward(''); setDeadlineLabel(''); setLocationName('UTown, NUS');
+    setReward(''); setDeadlineLabel(''); setLocationName('');
+    setPreciseLocation(''); setLocationSearch('');
     setPickedLat(null); setPickedLon(null);
     setIsFlash(false); setQuestType('standard'); setMaxAcceptors(2);
     setStep('Details'); setError('');
@@ -227,13 +216,11 @@ export default function PostQuest() {
   const [mode, setMode] = useState<FulfilmentMode>('meetup');
   const [reward, setReward] = useState('');
   const [deadlineLabel, setDeadlineLabel] = useState<DeadlineLabel | ''>('');
-  const [locationName, setLocationName] = useState('UTown, NUS');
-  const [pickedLat, setPickedLat] = useState<number | null>(
-    params.lat ? parseFloat(params.lat) : null,
-  );
-  const [pickedLon, setPickedLon] = useState<number | null>(
-    params.lon ? parseFloat(params.lon) : null,
-  );
+  const [locationName, setLocationName] = useState('');
+  const [preciseLocation, setPreciseLocation] = useState('');
+  const [locationSearch, setLocationSearch] = useState('');
+  const [pickedLat, setPickedLat] = useState<number | null>(null);
+  const [pickedLon, setPickedLon] = useState<number | null>(null);
   const [isFlash, setIsFlash] = useState(false);
 
   const [questType, setQuestType] = useState<'standard' | 'social' | 'crew'>('standard');
@@ -273,7 +260,8 @@ export default function PostQuest() {
 
   function resetForm() {
     setTitle(''); setDescription(''); setTag(''); setMode('meetup');
-    setReward(''); setDeadlineLabel(''); setLocationName('UTown, NUS');
+    setReward(''); setDeadlineLabel(''); setLocationName('');
+    setPreciseLocation(''); setLocationSearch('');
     setPickedLat(null); setPickedLon(null);
     setIsFlash(false); setQuestType('standard'); setMaxAcceptors(2);
     setStep('Details'); setError('');
@@ -360,7 +348,9 @@ export default function PostQuest() {
           tag: (tag || 'errands') as QuestTag, fulfilment_mode: mode,
           reward_amount: questType === 'social' ? 0 : (parseFloat(reward) || 0),
           deadline: deadlineDate.toISOString(),
-          location_name: locationName || 'UTown, NUS',
+          location_name: preciseLocation.trim()
+            ? `${locationName || 'UTown'} — ${preciseLocation.trim()}`
+            : (locationName || 'UTown, NUS'),
           latitude: pickedLat ?? UTOWN_LAT, longitude: pickedLon ?? UTOWN_LNG,
           geohash: encodeGeohash(pickedLat ?? UTOWN_LAT, pickedLon ?? UTOWN_LNG),
           status: 'open', is_flash: isFlash, flash_expires_at: flashExpiresAt,
@@ -431,6 +421,9 @@ export default function PostQuest() {
       const err = validateDetails();
       if (err) { setError(err); return; }
     }
+    if (step === 'Location') {
+      if (!locationName) { setError('Please select a location.'); return; }
+    }
     if (step === 'Reward') {
       if (!deadlineLabel) { setError('Please select a deadline.'); return; }
       const d = buildDeadlineFromLabel(deadlineLabel as DeadlineLabel);
@@ -453,7 +446,27 @@ export default function PostQuest() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' && postMode === 'ai' ? 90 : 0}
     >
-      <ScreenHeader title="Post a Quest" />
+      <ScreenHeader
+        title="Post a Quest"
+        backAction={postMode === 'manual' && stepIndex > 0}
+        onBack={back}
+        rightAction={
+          <TouchableOpacity
+            onPress={() => { resetForm(); resetAiChat(); }}
+            hitSlop={12}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              backgroundColor: 'rgba(255,255,255,0.08)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <X size={16} color="rgba(255,255,255,0.50)" strokeWidth={2} />
+          </TouchableOpacity>
+        }
+      />
 
       {/* Mode Toggle — stable position, never remounts */}
       <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
@@ -749,6 +762,41 @@ export default function PostQuest() {
             ))}
           </View>
 
+          {/* Live preview */}
+          {title.trim() && (
+            <View style={{ marginTop: 24, marginBottom: 8 }}>
+              <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 10 }}>
+                PREVIEW
+              </Text>
+              <Card>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700', flex: 1, lineHeight: 22 }} numberOfLines={2}>
+                    {title}
+                  </Text>
+                  {tag ? (
+                    <View style={{
+                      paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
+                      backgroundColor: (TAG_COLOURS[tag] ?? '#7c3aed') + '22',
+                    }}>
+                      <Text style={{ color: TAG_COLOURS[tag] ?? '#a78bfa', fontSize: 11, fontWeight: '700', textTransform: 'capitalize' }}>
+                        {tag}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+                {description.trim() ? (
+                  <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, lineHeight: 19, marginBottom: 10 }} numberOfLines={3}>
+                    {description}
+                  </Text>
+                ) : null}
+                <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                  <Badge variant="mode" value={mode} />
+                  {questType !== 'standard' && <Badge variant="default" value={questType} />}
+                </View>
+              </Card>
+            </View>
+          )}
+
           <Button variant="primary" size="lg" onPress={next} style={{ width: '100%' }}>
             Next
           </Button>
@@ -762,67 +810,107 @@ export default function PostQuest() {
             Where?
           </Text>
           <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, marginBottom: 24 }}>
-            Select a UTown location or type a custom one.
+            Search for a location, then add a precise spot.
           </Text>
 
           {error ? (
             <Text style={{ color: '#ef4444', fontSize: 13, marginBottom: 16 }}>{error}</Text>
           ) : null}
 
-          <Input
-            label="Location"
-            placeholder="e.g. RC4 Lounge, Level 2"
-            value={locationName}
-            onChangeText={setLocationName}
-          />
-
-          {/* Picked coordinates indicator */}
-          {pickedLat && pickedLon && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
-              <MapPin size={14} color="#10b981" />
-              <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '600' }}>
-                Pin set: {pickedLat.toFixed(5)}, {pickedLon.toFixed(5)}
-              </Text>
-            </View>
-          )}
-
-          {/* Pick on Map button */}
-          <Pressable
-            onPress={() => router.push('/(tabs)/map?mode=pick')}
-            style={({ pressed }) => ({
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              marginTop: 16,
-              paddingVertical: 14,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: 'rgba(124,58,237,0.5)',
-              backgroundColor: pressed ? 'rgba(124,58,237,0.15)' : 'rgba(124,58,237,0.08)',
-            })}
-          >
-            <MapPin size={18} color="#a78bfa" />
-            <Text style={{ color: '#a78bfa', fontWeight: '700', fontSize: 15 }}>
-              Pick on Map
+          {/* Location search */}
+          <View style={{ marginBottom: 8 }}>
+            <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8 }}>
+              LOCATION
             </Text>
-          </Pressable>
-
-          <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginTop: 20, marginBottom: 12 }}>
-            QUICK SELECT
-          </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 28 }}>
-            {RC_LOCATIONS.map((loc) => (
-              <Chip
-                key={loc}
-                label={loc}
-                selected={locationName === loc}
-                onPress={() => setLocationName(loc)}
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', gap: 10,
+              backgroundColor: 'rgba(255,255,255,0.05)',
+              borderWidth: 1,
+              borderColor: locationName ? 'rgba(124,58,237,0.50)' : 'rgba(255,255,255,0.10)',
+              borderRadius: 14, paddingHorizontal: 14, height: 50,
+            }}>
+              <Search size={16} color={locationName ? '#a78bfa' : 'rgba(255,255,255,0.30)'} />
+              <TextInput
+                value={locationSearch}
+                onChangeText={(t) => {
+                  setLocationSearch(t);
+                  if (!t) { setLocationName(''); setPickedLat(null); setPickedLon(null); }
+                }}
+                placeholder={locationName || 'Search RC4, Frontier, The Deck…'}
+                placeholderTextColor={locationName ? '#a78bfa' : 'rgba(255,255,255,0.30)'}
+                style={{ flex: 1, color: '#fff', fontSize: 15 }}
               />
-            ))}
+              {locationName ? (
+                <TouchableOpacity onPress={() => { setLocationName(''); setLocationSearch(''); setPickedLat(null); setPickedLon(null); }} hitSlop={8}>
+                  <X size={14} color="rgba(255,255,255,0.40)" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {/* Autocomplete dropdown */}
+            {locationSearch.trim().length > 0 && (() => {
+              const results = NUS_LOCATIONS.filter((l) =>
+                l.name.toLowerCase().includes(locationSearch.toLowerCase())
+              ).slice(0, 6);
+              return results.length > 0 ? (
+                <View style={{
+                  backgroundColor: 'rgba(18,18,22,0.97)',
+                  borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+                  borderRadius: 14, marginTop: 4, overflow: 'hidden',
+                }}>
+                  {results.map((loc, i) => (
+                    <TouchableOpacity
+                      key={loc.name}
+                      onPress={() => {
+                        setLocationName(loc.name);
+                        setLocationSearch('');
+                        setPickedLat(loc.latitude);
+                        setPickedLon(loc.longitude);
+                      }}
+                      style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 10,
+                        paddingHorizontal: 14, paddingVertical: 13,
+                        borderTopWidth: i === 0 ? 0 : 1,
+                        borderTopColor: 'rgba(255,255,255,0.06)',
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <MapPin size={14} color="rgba(255,255,255,0.35)" />
+                      <Text style={{ color: '#fff', fontSize: 14, flex: 1 }}>{loc.name}</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11, textTransform: 'capitalize' }}>
+                        {loc.category}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : (
+                <View style={{ paddingVertical: 12, paddingHorizontal: 14 }}>
+                  <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 13 }}>No locations found</Text>
+                </View>
+              );
+            })()}
           </View>
 
-          <View style={{ flexDirection: 'row', gap: 12 }}>
+          {/* Precise location — shown after a location is selected */}
+          {locationName ? (
+            <View style={{ marginTop: 16 }}>
+              <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8 }}>
+                PRECISE SPOT (OPTIONAL)
+              </Text>
+              <Input
+                placeholder="e.g. Next to Jollibee, Level 1"
+                value={preciseLocation}
+                onChangeText={setPreciseLocation}
+              />
+              <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 12, marginTop: 6 }}>
+                Shown as: <Text style={{ color: 'rgba(255,255,255,0.50)' }}>
+                  {preciseLocation.trim() ? `${locationName} — ${preciseLocation.trim()}` : locationName}
+                </Text>
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 28 }}>
             <Button variant="secondary" size="lg" style={{ flex: 1 }} onPress={back}>
               Back
             </Button>
