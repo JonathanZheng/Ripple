@@ -46,6 +46,7 @@ export default function ContactsGraph() {
       {/* All contacts list */}
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 100, paddingTop: 16 }}
+        showsVerticalScrollIndicator={false}
       >
         <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 14 }}>
           ALL CONTACTS
