@@ -120,10 +120,11 @@ function FloatingTabBar() {
     <View
       style={{
         position: 'absolute',
-        bottom: insets.bottom + 16,
-        left: 20,
-        right: 20,
+        bottom: 0,
+        left: 0,
+        right: 0,
         alignItems: 'center',
+        paddingBottom: insets.bottom,
         pointerEvents: 'box-none',
       }}
     >
@@ -133,9 +134,8 @@ function FloatingTabBar() {
           alignItems: 'center',
           justifyContent: 'space-around',
           backgroundColor: colors.tabBar,
-          borderWidth: 1,
+          borderTopWidth: 1,
           borderColor: colors.tabBarBorder,
-          borderRadius: 24,
           paddingHorizontal: 8,
           paddingVertical: 6,
           width: '100%',

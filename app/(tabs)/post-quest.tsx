@@ -36,6 +36,18 @@ import { StepIndicator } from '@/components/ui/StepIndicator';
 import { Users, Package, Send, Zap, MapPin, X, Search } from 'lucide-react-native';
 import type { QuestTag, FulfilmentMode } from '@/types/database';
 
+// ─── Price Suggestion ─────────────────────────────────────────────────────────
+function suggestPrice(tag: QuestTag | ''): { min: number; max: number; label: string } | null {
+  switch (tag) {
+    case 'food':      return { min: 2, max: 5,  label: 'Quick errand' };
+    case 'transport': return { min: 3, max: 8,  label: 'Getting around' };
+    case 'skills':    return { min: 10, max: 25, label: 'Skills take time' };
+    case 'errands':   return { min: 3, max: 10, label: 'General help' };
+    case 'social':    return { min: 0, max: 0,  label: 'No payment for social' };
+    default:          return null;
+  }
+}
+
 // NUS UTown rough centre
 const UTOWN_LAT = 1.3063;
 const UTOWN_LNG = 103.7733;
@@ -942,6 +954,25 @@ export default function PostQuest() {
           value={reward}
           onChangeText={setReward}
         />
+        {(() => {
+          const suggestion = suggestPrice(tag);
+          if (!suggestion) return null;
+          if (suggestion.min === 0 && suggestion.max === 0) return null;
+          const midpoint = Math.round((suggestion.min + suggestion.max) / 2 * 2) / 2;
+          return (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 4 }}>
+              <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, flex: 1 }}>
+                💡 Suggested: ${suggestion.min}–${suggestion.max} for {suggestion.label.toLowerCase()}
+              </Text>
+              <Pressable
+                onPress={() => setReward(String(midpoint))}
+                style={{ backgroundColor: 'rgba(124,58,237,0.15)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.35)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 }}
+              >
+                <Text style={{ color: '#a78bfa', fontSize: 12, fontWeight: '700' }}>Use</Text>
+              </Pressable>
+            </View>
+          );
+        })()}
         <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 6, marginBottom: 20 }}>
           Leave blank for favour-only quests. Payment settled privately via PayNow/cash.
         </Text>

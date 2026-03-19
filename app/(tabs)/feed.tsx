@@ -125,6 +125,9 @@ export default function Feed() {
   const [rewardFilter, setRewardFilter] = useState<RewardFilter>('all');
   const [deadlineFilter, setDeadlineFilter] = useState<DeadlineFilter>('all');
   const [search, setSearch] = useState('');
+  const [searchMode, setSearchMode] = useState<'keyword' | 'semantic'>('keyword');
+  const [semanticResults, setSemanticResults] = useState<Quest[] | null>(null);
+  const [semanticLoading, setSemanticLoading] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const { activeOffer, cancelOffer } = useRouteOffer(session?.user?.id);
 
@@ -161,6 +164,7 @@ export default function Feed() {
   const [acceptHistory, setAcceptHistory] = useState<AcceptedQuestSummary[]>([]);
   const [sessionBoosts, setSessionBoosts] = useState<SessionTagBoosts>(initialSessionBoosts());
   const [seenCounts, setSeenCounts] = useState<Map<string, number>>(new Map());
+  const [contactIds, setContactIds] = useState<Set<string>>(new Set());
 
   const dropdownHeight = useSharedValue(0);
   const dropdownStyle = useAnimatedStyle(() => ({
@@ -205,15 +209,48 @@ export default function Feed() {
     return (data ?? []) as AcceptedQuestSummary[];
   }
 
+  async function fetchContactIds(userId: string) {
+    const { data } = await supabase.from('contacts').select('contact_id').eq('user_id', userId);
+    if (data) setContactIds(new Set(data.map((c: any) => c.contact_id)));
+  }
+
   useFocusEffect(
     useCallback(() => {
       const userId = session?.user.id;
       Promise.all([
         fetchQuests(),
         userId ? fetchHistory(userId).then(setAcceptHistory) : Promise.resolve(),
+        userId ? fetchContactIds(userId) : Promise.resolve(),
       ]).finally(() => setLoading(false));
     }, [session?.user.id]),
   );
+
+  async function runSemanticSearch(query: string) {
+    if (!query.trim()) { setSemanticResults(null); return; }
+    setSemanticLoading(true);
+    try {
+      const { data: embedData, error: embedErr } = await supabase.functions.invoke('embed-query', {
+        body: { query },
+      });
+      if (embedErr || !embedData?.embedding) { setSemanticLoading(false); return; }
+      const { data: matches } = await supabase.rpc('search_quests', {
+        query_embedding: embedData.embedding,
+        match_threshold: 0.5,
+        match_count: 20,
+      });
+      if (matches) {
+        const ids = (matches as { id: string }[]).map(m => m.id);
+        const { data: questData } = await supabase.from('quests').select('*').in('id', ids).eq('status', 'open');
+        if (questData) {
+          const ordered = ids
+            .map(id => (questData as Quest[]).find(q => q.id === id))
+            .filter((q): q is Quest => !!q);
+          setSemanticResults(ordered);
+        }
+      }
+    } catch { /* ignore */ }
+    setSemanticLoading(false);
+  }
 
   useEffect(() => {
     channelRef.current = supabase
@@ -323,7 +360,20 @@ export default function Feed() {
     return rankFeed(filtered, rankingContext);
   }, [filtered, rankingContext]);
 
-  const feedData = [...pinned, ...ranked.map(r => r.quest)];
+  // Apply contacts boost: quests posted by contacts float up
+  const rankedWithContactBoost = [...ranked].sort((a, b) => {
+    const aBoost = contactIds.has(a.quest.poster_id) ? 1 : 0;
+    const bBoost = contactIds.has(b.quest.poster_id) ? 1 : 0;
+    if (bBoost !== aBoost) return bBoost - aBoost;
+    return b.score - a.score;
+  });
+
+  // Semantic mode overrides the ranked list when results available
+  const activeQuestList = searchMode === 'semantic' && semanticResults !== null
+    ? semanticResults
+    : [...pinned, ...rankedWithContactBoost.map(r => r.quest)];
+
+  const feedData = activeQuestList;
 
   const onYourWayIds = useMemo((): Set<string> => {
     if (!activeOffer) return new Set();
@@ -532,13 +582,40 @@ export default function Feed() {
               <View style={{ flex: 1 }}>
                 <Input
                   leftIcon={Search}
-                  placeholder="Search quests..."
+                  placeholder={searchMode === 'semantic' ? 'Semantic search...' : 'Search quests...'}
                   value={search}
-                  onChangeText={setSearch}
+                  onChangeText={(t) => {
+                    setSearch(t);
+                    if (searchMode === 'semantic') setSemanticResults(null);
+                  }}
                   returnKeyType="search"
+                  onSubmitEditing={() => { if (searchMode === 'semantic') runSemanticSearch(search); }}
                   rounded
                 />
               </View>
+              {/* AI / Semantic toggle pill */}
+              <Pressable
+                onPress={() => {
+                  const next = searchMode === 'keyword' ? 'semantic' : 'keyword';
+                  setSearchMode(next);
+                  setSemanticResults(null);
+                  if (next === 'semantic' && search.trim()) runSemanticSearch(search);
+                }}
+                style={{
+                  paddingHorizontal: 12,
+                  height: 44,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: searchMode === 'semantic' ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.06)',
+                  borderWidth: 1,
+                  borderColor: searchMode === 'semantic' ? 'rgba(124,58,237,0.50)' : 'rgba(255,255,255,0.10)',
+                }}
+              >
+                <Text style={{ color: searchMode === 'semantic' ? '#a78bfa' : 'rgba(255,255,255,0.50)', fontSize: 12, fontWeight: '700' }}>
+                  AI
+                </Text>
+              </Pressable>
               <Pressable
                 onPress={toggleFilter}
                 style={{
@@ -671,9 +748,14 @@ export default function Feed() {
           </View>
         }
         ListEmptyComponent={
-          loading ? (
+          loading || semanticLoading ? (
             <View style={{ alignItems: 'center', justifyContent: 'center', paddingTop: 80 }}>
               <ActivityIndicator color={colors.textFaint} size="large" />
+              {semanticLoading && (
+                <Text style={{ color: colors.textFaint, fontSize: 13, marginTop: 12 }}>
+                  Finding similar quests...
+                </Text>
+              )}
             </View>
           ) : (
             <View style={{ alignItems: 'center', justifyContent: 'center', paddingTop: 60, paddingHorizontal: 24 }}>

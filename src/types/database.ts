@@ -38,13 +38,13 @@ export type ReportStatus = 'pending' | 'reviewed' | 'resolved' | 'dismissed';
 export type CrewMemberStatus = 'active' | 'dropped_out';
 
 export interface NotificationPreferences {
-  ai_matches?: boolean;
+  new_quest?: boolean;
   quest_accepted?: boolean;
-  quest_completed?: boolean;
-  chat_messages?: boolean;
+  quest_complete?: boolean;
+  chat_message?: boolean;
+  route_offer_nearby?: boolean;
   flash_quests?: boolean;
-  route_offer_matches?: boolean;
-  frequency?: 'instant' | 'hourly' | 'off';
+  categories?: string[];
 }
 
 export interface Profile {
@@ -143,6 +143,9 @@ export interface DirectMessage {
   sender_id: string;
   recipient_id: string;
   content: string;
+  message_type: MessageType;
+  latitude: number | null;
+  longitude: number | null;
   created_at: string;
 }
 
@@ -239,6 +242,19 @@ export type Database = {
           content: string;
           type?: MessageType;
           image_url?: string | null;
+          latitude?: number | null;
+          longitude?: number | null;
+        };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      direct_messages: {
+        Row: DirectMessage;
+        Insert: {
+          sender_id: string;
+          recipient_id: string;
+          content: string;
+          message_type?: MessageType;
           latitude?: number | null;
           longitude?: number | null;
         };

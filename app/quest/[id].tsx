@@ -10,7 +10,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Linking,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -28,7 +27,8 @@ import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { GlassView } from '@/components/ui/GlassView';
-import { DollarSign, Clock, MapPin, Send, Star, Camera, Navigation, Users, MessageCircle } from 'lucide-react-native';
+import { DollarSign, Clock, MapPin, Send, Star, Camera, Navigation, Navigation2, Users, MessageCircle, Flag, UserPlus } from 'lucide-react-native';
+import { ReportModal } from '@/components/ReportModal';
 import { Chip } from '@/components/ui/Chip';
 import { useTheme } from '@/lib/ThemeContext';
 import type { Quest, Profile, Message, Rating, TrustTier } from '@/types/database';
@@ -130,6 +130,54 @@ function StarPicker({ value, onChange }: { value: number; onChange: (n: number) 
   );
 }
 
+function formatCoords(lat: number, lng: number) {
+  return `${Math.abs(lat).toFixed(5)}°${lat >= 0 ? 'N' : 'S'}  ${Math.abs(lng).toFixed(5)}°${lng >= 0 ? 'E' : 'W'}`;
+}
+
+function LocationBubble({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolean }) {
+  return (
+    <Pressable
+      onPress={() => router.push({ pathname: '/(tabs)/map', params: { focusLat: lat.toString(), focusLng: lng.toString(), focusLabel: 'Shared location' } } as any)}
+      style={{
+        maxWidth: '80%',
+        borderRadius: 18,
+        borderBottomRightRadius: isMe ? 4 : 18,
+        borderBottomLeftRadius: isMe ? 18 : 4,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: isMe ? 'rgba(124,58,237,0.5)' : 'rgba(255,255,255,0.12)',
+      }}
+    >
+      {/* Grid preview */}
+      <View style={{ height: 80, backgroundColor: isMe ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+        {[0.25, 0.5, 0.75].map((v) => (
+          <View key={`h${v}`} style={{ position: 'absolute', left: 0, right: 0, top: `${v * 100}%` as any, height: 1, backgroundColor: isMe ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.07)' }} />
+        ))}
+        {[0.25, 0.5, 0.75].map((v) => (
+          <View key={`v${v}`} style={{ position: 'absolute', top: 0, bottom: 0, left: `${v * 100}%` as any, width: 1, backgroundColor: isMe ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.07)' }} />
+        ))}
+        <View style={{ alignItems: 'center' }}>
+          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isMe ? '#7c3aed' : 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4 }}>
+            <MapPin size={16} color="#fff" strokeWidth={2.5} />
+          </View>
+          <View style={{ width: 2, height: 6, backgroundColor: isMe ? '#7c3aed' : 'rgba(255,255,255,0.4)', marginTop: -1 }} />
+        </View>
+      </View>
+      {/* Label row */}
+      <View style={{ paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, backgroundColor: isMe ? 'rgba(124,58,237,0.18)' : 'rgba(255,255,255,0.05)' }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Shared location</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 2 }}>{formatCoords(lat, lng)}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: isMe ? 'rgba(124,58,237,0.35)' : 'rgba(255,255,255,0.10)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 }}>
+          <Navigation2 size={11} color={isMe ? '#c4b5fd' : 'rgba(255,255,255,0.6)'} />
+          <Text style={{ color: isMe ? '#c4b5fd' : 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '600' }}>Ripple Map</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 export default function QuestDetail() {
   const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const { session } = useSession();
@@ -150,6 +198,11 @@ export default function QuestDetail() {
   const [crewCount, setCrewCount] = useState(0);
   const [isCrewMember, setIsCrewMember] = useState(false);
   const [activeView, setActiveView] = useState<'details' | 'chat'>('details');
+  const [showContactPrompt, setShowContactPrompt] = useState(false);
+  const [contactPromptUserId, setContactPromptUserId] = useState<string | null>(null);
+  const [contactPromptName, setContactPromptName] = useState('');
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportTargetId, setReportTargetId] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const chatListRef = useRef<FlatList>(null);
   const acceptorFetched = useRef(false);
@@ -315,6 +368,10 @@ export default function QuestDetail() {
     }
     if (acceptorProfile?.push_token) await sendPushNotification(acceptorProfile.push_token, 'Quest Completed!', `${quest.title} — please rate your experience.`);
     setActionLoading(false);
+    // Prompt to add acceptor as contact
+    if (quest.acceptor_id && acceptorProfile) {
+      await checkAndPromptContact(quest.acceptor_id, acceptorProfile.display_name);
+    }
   };
 
   const handleMarkComplete = async () => {
@@ -330,6 +387,31 @@ export default function QuestDetail() {
     }
     if (acceptorProfile?.push_token) await sendPushNotification(acceptorProfile.push_token, 'Quest Completed!', `${quest.title} — please rate your experience.`);
     setActionLoading(false);
+    // Prompt to add acceptor as contact (poster marks complete)
+    if (quest.acceptor_id && acceptorProfile) {
+      await checkAndPromptContact(quest.acceptor_id, acceptorProfile.display_name);
+    }
+    // Acceptor completing social quest — prompt to add poster
+    const isPoster = userId === quest.poster_id;
+    if (!isPoster && posterProfile) {
+      await checkAndPromptContact(quest.poster_id, posterProfile.display_name);
+    }
+  };
+
+  const checkAndPromptContact = useCallback(async (otherId: string, otherName: string) => {
+    if (!userId || !otherId || otherId === userId) return;
+    const { data } = await supabase.from('contacts').select('contact_id').eq('user_id', userId).eq('contact_id', otherId).maybeSingle();
+    if (!data) {
+      setContactPromptUserId(otherId);
+      setContactPromptName(otherName);
+      setShowContactPrompt(true);
+    }
+  }, [userId]);
+
+  const handleAddContact = async () => {
+    if (!userId || !contactPromptUserId) return;
+    await supabase.from('contacts').insert({ user_id: userId, contact_id: contactPromptUserId });
+    setShowContactPrompt(false);
   };
 
   const handleRating = async () => {
@@ -590,30 +672,26 @@ export default function QuestDetail() {
             {senderProfile.display_name}
           </Text>
         )}
-        <View style={{
-          maxWidth: '80%',
-          backgroundColor: isMe ? 'rgba(124,58,237,0.70)' : colors.surface2,
-          borderRadius: 18,
-          borderBottomRightRadius: isMe ? 4 : 18,
-          borderBottomLeftRadius: isMe ? 18 : 4,
-          overflow: 'hidden',
-        }}>
-          {(msg as any).type === 'image' && (msg as any).image_url ? (
-            <Image source={{ uri: (msg as any).image_url }} style={{ width: 200, height: 150 }} resizeMode="cover" />
-          ) : (msg as any).type === 'location' && (msg as any).latitude ? (
-            <Pressable
-              style={{ paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}
-              onPress={() => Linking.openURL(`https://maps.google.com/?q=${(msg as any).latitude},${(msg as any).longitude}`)}
-            >
-              <Navigation size={16} color="#ffffff" strokeWidth={2} />
-              <Text style={{ color: '#ffffff', fontSize: 14, lineHeight: 20, textDecorationLine: 'underline' }}>View Location</Text>
-            </Pressable>
-          ) : (
-            <View style={{ paddingHorizontal: 14, paddingVertical: 10 }}>
-              <Text style={{ color: '#ffffff', fontSize: 14, lineHeight: 20 }}>{msg.content}</Text>
-            </View>
-          )}
-        </View>
+        {(msg as any).type === 'location' && (msg as any).latitude ? (
+          <LocationBubble lat={(msg as any).latitude} lng={(msg as any).longitude} isMe={isMe} />
+        ) : (
+          <View style={{
+            maxWidth: '80%',
+            backgroundColor: isMe ? 'rgba(124,58,237,0.70)' : colors.surface2,
+            borderRadius: 18,
+            borderBottomRightRadius: isMe ? 4 : 18,
+            borderBottomLeftRadius: isMe ? 18 : 4,
+            overflow: 'hidden',
+          }}>
+            {(msg as any).type === 'image' && (msg as any).image_url ? (
+              <Image source={{ uri: (msg as any).image_url }} style={{ width: 200, height: 150 }} resizeMode="cover" />
+            ) : (
+              <View style={{ paddingHorizontal: 14, paddingVertical: 10 }}>
+                <Text style={{ color: '#ffffff', fontSize: 14, lineHeight: 20 }}>{msg.content}</Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
     );
   };
@@ -623,7 +701,22 @@ export default function QuestDetail() {
       <ScreenHeader
         backAction
         title={quest.ai_generated_title ?? quest.title}
-        rightAction={<Badge variant="status" value={quest.status} />}
+        rightAction={
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Badge variant="status" value={quest.status} />
+            {userId !== quest.poster_id && (
+              <Pressable
+                onPress={() => {
+                  setReportTargetId(quest.poster_id);
+                  setReportModalVisible(true);
+                }}
+                hitSlop={12}
+              >
+                <Flag size={16} color="rgba(255,255,255,0.40)" strokeWidth={1.8} />
+              </Pressable>
+            )}
+          </View>
+        }
         onBack={() => {
           const dest: Record<string, string> = {
             feed: '/(tabs)/feed',
@@ -692,8 +785,34 @@ export default function QuestDetail() {
             </View>
           </Card>
 
-          {posterProfile && <View style={{ marginBottom: 10 }}><ProfileCard label="Posted by" profile={posterProfile} /></View>}
-          {acceptorProfile && <View style={{ marginBottom: 16 }}><ProfileCard label="Accepted by" profile={acceptorProfile} /></View>}
+          {posterProfile && (
+            <View style={{ marginBottom: 10 }}>
+              <ProfileCard label="Posted by" profile={posterProfile} />
+              {userId !== quest.poster_id && (quest.status === 'in_progress' || quest.status === 'completed') && (
+                <Pressable
+                  onPress={() => checkAndPromptContact(quest.poster_id, posterProfile.display_name)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, alignSelf: 'flex-start' }}
+                >
+                  <UserPlus size={13} color="rgba(167,139,250,0.80)" strokeWidth={2} />
+                  <Text style={{ color: 'rgba(167,139,250,0.80)', fontSize: 13, fontWeight: '500' }}>Add as Contact</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+          {acceptorProfile && (
+            <View style={{ marginBottom: 16 }}>
+              <ProfileCard label="Accepted by" profile={acceptorProfile} />
+              {userId !== quest.acceptor_id && (quest.status === 'in_progress' || quest.status === 'completed') && (
+                <Pressable
+                  onPress={() => checkAndPromptContact(quest.acceptor_id!, acceptorProfile.display_name)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, alignSelf: 'flex-start' }}
+                >
+                  <UserPlus size={13} color="rgba(167,139,250,0.80)" strokeWidth={2} />
+                  <Text style={{ color: 'rgba(167,139,250,0.80)', fontSize: 13, fontWeight: '500' }}>Add as Contact</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
 
           {/* Action area */}
           <View style={{ marginBottom: 24 }}>
@@ -793,6 +912,47 @@ export default function QuestDetail() {
           </GlassView>
         </KeyboardAvoidingView>
       )}
+
+      {/* Add Contact Prompt */}
+      {showContactPrompt && (
+        <View style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          backgroundColor: colors.surface,
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          padding: 24,
+          borderTopWidth: 1, borderColor: colors.border,
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(124,58,237,0.15)', alignItems: 'center', justifyContent: 'center' }}>
+              <UserPlus size={18} color="#a78bfa" strokeWidth={2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.text, fontWeight: '700', fontSize: 15 }}>
+                Add to Ripple Contacts?
+              </Text>
+              <Text style={{ color: colors.textFaint, fontSize: 13 }}>
+                {contactPromptName}
+              </Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Button variant="secondary" size="md" style={{ flex: 1 }} onPress={() => setShowContactPrompt(false)}>
+              Skip
+            </Button>
+            <Button variant="primary" size="md" style={{ flex: 1 }} onPress={handleAddContact}>
+              Add Contact
+            </Button>
+          </View>
+        </View>
+      )}
+
+      {/* Report Modal */}
+      <ReportModal
+        visible={reportModalVisible}
+        reportedUserId={reportTargetId}
+        questId={quest?.id}
+        onClose={() => setReportModalVisible(false)}
+      />
     </View>
   );
 }
