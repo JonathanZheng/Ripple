@@ -15,10 +15,11 @@ import { Badge } from '@/components/ui/Badge';
 import { Chip } from '@/components/ui/Chip';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { X, Plus, Flame, AlertTriangle, Layers, Settings, Navigation2 } from 'lucide-react-native';
+import { X, Plus, Flame, AlertTriangle, Layers, Settings, Navigation2, Users } from 'lucide-react-native';
 import { useTheme } from '@/lib/ThemeContext';
 import { Pressable } from 'react-native';
 import { useRouteOffer } from '@/hooks/useRouteOffer';
+import { useContacts } from '@/hooks/useContacts';
 import type { Profile, Quest } from '@/types/database';
 
 type Tab = 'posted' | 'inprogress' | 'completed';
@@ -34,6 +35,7 @@ export default function ProfileScreen() {
   const userId = session?.user?.id;
   const insets = useSafeAreaInsets();
   const { activeOffer, cancelOffer } = useRouteOffer(userId);
+  const { contacts } = useContacts(userId);
 
   const { colors } = useTheme();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -238,6 +240,34 @@ export default function ProfileScreen() {
             </Card>
           </View>
         )}
+
+        {/* Contacts */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
+          <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 12 }}>
+            CONTACTS
+          </Text>
+          <Card style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(124,58,237,0.10)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.20)', alignItems: 'center', justifyContent: 'center' }}>
+                <Users size={16} color="#a78bfa" strokeWidth={2} />
+              </View>
+              <View>
+                <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 15 }}>
+                  {contacts.length} {contacts.length === 1 ? 'Contact' : 'Contacts'}
+                </Text>
+                <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>
+                  Ripple network
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              onPress={() => router.push('/contacts-graph')}
+              style={{ backgroundColor: 'rgba(124,58,237,0.12)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.25)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 }}
+            >
+              <Text style={{ color: '#a78bfa', fontSize: 13, fontWeight: '600' }}>View Graph</Text>
+            </Pressable>
+          </Card>
+        </View>
 
         {/* Skills */}
         <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>

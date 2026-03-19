@@ -28,7 +28,8 @@ import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { GlassView } from '@/components/ui/GlassView';
-import { DollarSign, Clock, MapPin, Send, Star, Camera, Navigation, Users, MessageCircle } from 'lucide-react-native';
+import { DollarSign, Clock, MapPin, Send, Star, Camera, Navigation, Users, MessageCircle, Flag, UserPlus } from 'lucide-react-native';
+import { ReportModal } from '@/components/ReportModal';
 import { Chip } from '@/components/ui/Chip';
 import { useTheme } from '@/lib/ThemeContext';
 import type { Quest, Profile, Message, Rating, TrustTier } from '@/types/database';
@@ -150,6 +151,11 @@ export default function QuestDetail() {
   const [crewCount, setCrewCount] = useState(0);
   const [isCrewMember, setIsCrewMember] = useState(false);
   const [activeView, setActiveView] = useState<'details' | 'chat'>('details');
+  const [showContactPrompt, setShowContactPrompt] = useState(false);
+  const [contactPromptUserId, setContactPromptUserId] = useState<string | null>(null);
+  const [contactPromptName, setContactPromptName] = useState('');
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportTargetId, setReportTargetId] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const chatListRef = useRef<FlatList>(null);
   const acceptorFetched = useRef(false);
@@ -315,6 +321,10 @@ export default function QuestDetail() {
     }
     if (acceptorProfile?.push_token) await sendPushNotification(acceptorProfile.push_token, 'Quest Completed!', `${quest.title} — please rate your experience.`);
     setActionLoading(false);
+    // Prompt to add acceptor as contact
+    if (quest.acceptor_id && acceptorProfile) {
+      await checkAndPromptContact(quest.acceptor_id, acceptorProfile.display_name);
+    }
   };
 
   const handleMarkComplete = async () => {
@@ -330,6 +340,31 @@ export default function QuestDetail() {
     }
     if (acceptorProfile?.push_token) await sendPushNotification(acceptorProfile.push_token, 'Quest Completed!', `${quest.title} — please rate your experience.`);
     setActionLoading(false);
+    // Prompt to add acceptor as contact (poster marks complete)
+    if (quest.acceptor_id && acceptorProfile) {
+      await checkAndPromptContact(quest.acceptor_id, acceptorProfile.display_name);
+    }
+    // Acceptor completing social quest — prompt to add poster
+    const isPoster = userId === quest.poster_id;
+    if (!isPoster && posterProfile) {
+      await checkAndPromptContact(quest.poster_id, posterProfile.display_name);
+    }
+  };
+
+  const checkAndPromptContact = useCallback(async (otherId: string, otherName: string) => {
+    if (!userId || !otherId || otherId === userId) return;
+    const { data } = await supabase.from('contacts').select('contact_id').eq('user_id', userId).eq('contact_id', otherId).maybeSingle();
+    if (!data) {
+      setContactPromptUserId(otherId);
+      setContactPromptName(otherName);
+      setShowContactPrompt(true);
+    }
+  }, [userId]);
+
+  const handleAddContact = async () => {
+    if (!userId || !contactPromptUserId) return;
+    await supabase.from('contacts').insert({ user_id: userId, contact_id: contactPromptUserId });
+    setShowContactPrompt(false);
   };
 
   const handleRating = async () => {
@@ -623,7 +658,22 @@ export default function QuestDetail() {
       <ScreenHeader
         backAction
         title={quest.ai_generated_title ?? quest.title}
-        rightAction={<Badge variant="status" value={quest.status} />}
+        rightAction={
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Badge variant="status" value={quest.status} />
+            {userId !== quest.poster_id && (
+              <Pressable
+                onPress={() => {
+                  setReportTargetId(quest.poster_id);
+                  setReportModalVisible(true);
+                }}
+                hitSlop={12}
+              >
+                <Flag size={16} color="rgba(255,255,255,0.40)" strokeWidth={1.8} />
+              </Pressable>
+            )}
+          </View>
+        }
         onBack={() => {
           const dest: Record<string, string> = {
             feed: '/(tabs)/feed',
@@ -692,8 +742,34 @@ export default function QuestDetail() {
             </View>
           </Card>
 
-          {posterProfile && <View style={{ marginBottom: 10 }}><ProfileCard label="Posted by" profile={posterProfile} /></View>}
-          {acceptorProfile && <View style={{ marginBottom: 16 }}><ProfileCard label="Accepted by" profile={acceptorProfile} /></View>}
+          {posterProfile && (
+            <View style={{ marginBottom: 10 }}>
+              <ProfileCard label="Posted by" profile={posterProfile} />
+              {userId !== quest.poster_id && (quest.status === 'in_progress' || quest.status === 'completed') && (
+                <Pressable
+                  onPress={() => checkAndPromptContact(quest.poster_id, posterProfile.display_name)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, alignSelf: 'flex-start' }}
+                >
+                  <UserPlus size={13} color="rgba(167,139,250,0.80)" strokeWidth={2} />
+                  <Text style={{ color: 'rgba(167,139,250,0.80)', fontSize: 13, fontWeight: '500' }}>Add as Contact</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+          {acceptorProfile && (
+            <View style={{ marginBottom: 16 }}>
+              <ProfileCard label="Accepted by" profile={acceptorProfile} />
+              {userId !== quest.acceptor_id && (quest.status === 'in_progress' || quest.status === 'completed') && (
+                <Pressable
+                  onPress={() => checkAndPromptContact(quest.acceptor_id!, acceptorProfile.display_name)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, alignSelf: 'flex-start' }}
+                >
+                  <UserPlus size={13} color="rgba(167,139,250,0.80)" strokeWidth={2} />
+                  <Text style={{ color: 'rgba(167,139,250,0.80)', fontSize: 13, fontWeight: '500' }}>Add as Contact</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
 
           {/* Action area */}
           <View style={{ marginBottom: 24 }}>
@@ -793,6 +869,47 @@ export default function QuestDetail() {
           </GlassView>
         </KeyboardAvoidingView>
       )}
+
+      {/* Add Contact Prompt */}
+      {showContactPrompt && (
+        <View style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          backgroundColor: colors.surface,
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          padding: 24,
+          borderTopWidth: 1, borderColor: colors.border,
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(124,58,237,0.15)', alignItems: 'center', justifyContent: 'center' }}>
+              <UserPlus size={18} color="#a78bfa" strokeWidth={2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.text, fontWeight: '700', fontSize: 15 }}>
+                Add to Ripple Contacts?
+              </Text>
+              <Text style={{ color: colors.textFaint, fontSize: 13 }}>
+                {contactPromptName}
+              </Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Button variant="secondary" size="md" style={{ flex: 1 }} onPress={() => setShowContactPrompt(false)}>
+              Skip
+            </Button>
+            <Button variant="primary" size="md" style={{ flex: 1 }} onPress={handleAddContact}>
+              Add Contact
+            </Button>
+          </View>
+        </View>
+      )}
+
+      {/* Report Modal */}
+      <ReportModal
+        visible={reportModalVisible}
+        reportedUserId={reportTargetId}
+        questId={quest?.id}
+        onClose={() => setReportModalVisible(false)}
+      />
     </View>
   );
 }

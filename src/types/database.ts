@@ -38,13 +38,13 @@ export type ReportStatus = 'pending' | 'reviewed' | 'resolved' | 'dismissed';
 export type CrewMemberStatus = 'active' | 'dropped_out';
 
 export interface NotificationPreferences {
-  ai_matches?: boolean;
+  new_quest?: boolean;
   quest_accepted?: boolean;
-  quest_completed?: boolean;
-  chat_messages?: boolean;
+  quest_complete?: boolean;
+  chat_message?: boolean;
+  route_offer_nearby?: boolean;
   flash_quests?: boolean;
-  route_offer_matches?: boolean;
-  frequency?: 'instant' | 'hourly' | 'off';
+  categories?: string[];
 }
 
 export interface Profile {

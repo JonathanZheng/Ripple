@@ -1,6 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useContext, ReactNode } from 'react';
 
 export interface ThemeColors {
   background: string;
@@ -74,76 +72,15 @@ export const DARK_COLORS: ThemeColors = {
   chipSelectedText: '#000000',
 };
 
-export const LIGHT_COLORS: ThemeColors = {
-  background: '#f0f0f0',
-  surface: 'rgba(0,0,0,0.04)',
-  surface2: 'rgba(0,0,0,0.07)',
-  border: 'rgba(0,0,0,0.08)',
-  borderStrong: 'rgba(0,0,0,0.15)',
-  text: '#111111',
-  textMuted: 'rgba(0,0,0,0.50)',
-  textFaint: 'rgba(0,0,0,0.35)',
-  divider: 'rgba(0,0,0,0.06)',
-  inputBg: 'rgba(0,0,0,0.04)',
-  inputBorder: 'rgba(0,0,0,0.10)',
-  inputBorderFocus: 'rgba(0,0,0,0.35)',
-  inputText: '#111111',
-  inputPlaceholder: 'rgba(0,0,0,0.25)',
-  inputIcon: 'rgba(0,0,0,0.35)',
-  labelColor: 'rgba(0,0,0,0.50)',
-  tabBar: 'rgba(240,240,240,0.95)',
-  tabBarBorder: 'rgba(0,0,0,0.08)',
-  tabActive: '#111111',
-  tabInactive: 'rgba(0,0,0,0.35)',
-  tabActiveBg: 'rgba(0,0,0,0.08)',
-  primaryBg: '#111111',
-  primaryText: '#ffffff',
-  secondaryBg: 'rgba(0,0,0,0.05)',
-  secondaryBorder: 'rgba(0,0,0,0.15)',
-  secondaryText: '#111111',
-  ghostText: 'rgba(0,0,0,0.55)',
-  sectionLabel: 'rgba(0,0,0,0.35)',
-  chipBg: 'rgba(0,0,0,0.04)',
-  chipBorder: 'rgba(0,0,0,0.10)',
-  chipText: 'rgba(0,0,0,0.55)',
-  chipSelectedBg: 'rgba(0,0,0,0.85)',
-  chipSelectedText: '#ffffff',
-};
-
 interface ThemeContextType {
-  isDark: boolean;
   colors: ThemeColors;
-  toggleTheme: () => void;
 }
 
-const ThemeContext = createContext<ThemeContextType>({
-  isDark: true,
-  colors: DARK_COLORS,
-  toggleTheme: () => {},
-});
-
-const STORAGE_KEY = 'ripple_theme';
+const ThemeContext = createContext<ThemeContextType>({ colors: DARK_COLORS });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [isDark, setIsDark] = useState(true);
-
-  useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((val) => {
-      if (val === 'light') setIsDark(false);
-    });
-  }, []);
-
-  function toggleTheme() {
-    const next = !isDark;
-    setIsDark(next);
-    AsyncStorage.setItem(STORAGE_KEY, next ? 'dark' : 'light');
-    if (Platform.OS === 'web') {
-      (document.documentElement as HTMLElement).setAttribute('data-theme', next ? 'dark' : 'light');
-    }
-  }
-
   return (
-    <ThemeContext.Provider value={{ isDark, colors: isDark ? DARK_COLORS : LIGHT_COLORS, toggleTheme }}>
+    <ThemeContext.Provider value={{ colors: DARK_COLORS }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -2,7 +2,7 @@ DO NOT EDIT IF YOU ARE NOT JONATHAN!!!
 
 ---
 
-# Ripple — Change Log (Stages 0–4)
+# Ripple — Change Log (Stages 0–10 + Session Improvements)
 
 ---
 
@@ -315,3 +315,217 @@ The `parse-quest` Edge Function was never deployed, and the `OPENAI_API_KEY` was
 npx supabase secrets set OPENAI_API_KEY=sk-...
 npx supabase functions deploy chat-quest --no-verify-jwt
 ```
+
+---
+
+## Stage 6 — Quest Detail & Chat
+
+**Goal:** Full quest lifecycle from accept through in-progress chat to cancel/drop-out.
+
+### Files created / heavily modified
+| File | Purpose |
+|------|---------|
+| `app/quest/[id].tsx` | Complete quest detail screen |
+
+### Features
+- **Accept flow:** Scout taps Accept → status updates to `in_progress`, acceptor_id set; poster sees who accepted
+- **Real-time chat:** Supabase `messages` channel subscription — messages appear instantly for both parties; photo sharing in chat
+- **Role-based action area:** Different UI shown to poster vs scout vs other users
+- **Location sharing in chat:** Users can share their current GPS location as a message
+- **Cancel / Drop-out:** Poster can cancel (returns to open); scout can drop out (returns to open, strike risk)
+- **Realtime publication:** `messages` table added to `supabase_realtime` publication
+
+---
+
+## Stage 7 — Completion & Ratings
+
+**Goal:** End-to-end completion flow with photo proof, mutual confirmation, ratings, and trust tier recalculation.
+
+### Features
+- **Drop-off photo upload:** Scout uploads completion photo to `drop-off-photos` Supabase Storage bucket
+- **Meet-up confirmation:** Both parties confirm via in-app prompt
+- **Mark complete:** Quest status → `completed`; `quests_completed` counter incremented on profile
+- **Mutual ratings:** Both poster and scout rate each other (1–5 stars); `avg_rating` updated on profiles
+- **Trust tier recalc:** `update_trust_tier()` DB function called after rating — automatically promotes wanderer → explorer → champion based on `quests_completed` + `avg_rating` thresholds
+- **Strikes:** Scout receives strike if they drop out within grace window; `STRIKE_THRESHOLDS` enforced
+
+---
+
+## Stage 8 — Push Notifications & Profile
+
+**Goal:** Expo push notifications for key quest events; full profile screen with stats and skills.
+
+### Files created / heavily modified
+| File | Purpose |
+|------|---------|
+| `src/lib/notifications.ts` | `sendPushNotification()` helper — fetch-based POST to Expo push API (no native dependency) |
+| `app/(tabs)/profile.tsx` | Full profile screen replacing placeholder |
+
+### Notifications
+- Token registered on app start in `app/_layout.tsx` via `expo-notifications`; stored in `profiles.expo_push_token`
+- Triggered for: new quest acceptance, new chat message, quest completion, rating received
+
+### Profile screen
+- Avatar with trust-tier ring colour
+- Stats row: quests posted, quests completed, average rating
+- Skill tags: add/remove free-text skill chips (persisted to `profiles.skills` array)
+- Quest history tabs: Posted / In Progress / Completed
+
+---
+
+## Stage 9 — Leaderboard & Gamification
+
+**Goal:** RC leaderboard, quest streaks, and flash quest countdown.
+
+### Features
+- **RC Leaderboard:** Map tab repurposed as leaderboard — ranks all 7 RCs by total quests completed by residents; shows top contributor per RC
+- **Quest streaks:** `streak_count` on profile — increments if user completes a quest within 24h of last; shown as flame badge on profile
+- **Flash Quest countdown:** `FlashCountdown` component in `QuestCard` — live mm:ss timer with `ProgressBar`; turns red when under 5 minutes; flash quests expire after 30 minutes
+
+---
+
+## Stage 10 — Route Offers (Broadcast / Piggybacking)
+
+**Goal:** Allow users heading out to broadcast their route; nearby quest posters can DM them to piggyback on their trip.
+
+### New DB tables & functions
+| Object | Purpose |
+|--------|---------|
+| `route_offers` table | Active broadcasts: `user_id`, `destination_name`, `latitude`, `longitude`, `tags[]`, `note`, `expires_at`, `is_active` |
+| `direct_messages` table | 1:1 DMs between any two users: `sender_id`, `recipient_id`, `content`, `created_at` |
+| `find_nearby_route_offers` RPC | Finds active route offers within a radius of a given lat/lon |
+| pg_cron job | Automatically sets `is_active = false` on expired route offers |
+
+Both tables added to `supabase_realtime` publication (live presence + DM delivery).
+
+### Files created
+| File | Purpose |
+|------|---------|
+| `src/hooks/useRouteOffer.ts` | Fetch/create/cancel the current user's active route offer; realtime subscription |
+| `src/components/RouteOfferBanner.tsx` | Blue banner shown in feed when user has an active broadcast; cancel button |
+| `src/components/RouteOfferCard.tsx` | Card shown in Broadcast feed tab; "Chat" button → `/dm/[userId]` |
+| `app/route-offer-confirm.tsx` | Broadcast form: NUS location picker (40+ locations), duration selector, tag chips, optional note |
+| `app/dm/[userId].tsx` | Simple 1:1 direct message screen between two users |
+| `supabase/functions/notify-route-offers/index.ts` | Edge Function: when a quest is posted, finds nearby active broadcasters and sends them a push notification |
+
+### Files modified
+| File | Change |
+|------|--------|
+| `app/(tabs)/feed.tsx` | Added Quests / Broadcast toggle (animated sliding pill); Broadcast tab shows `RouteOfferCard` list with search + tag filter; `RouteOfferBanner` shown above feed when user has active offer |
+| `app/(tabs)/map.tsx` | Added "Going out?" FAB (bottom-right) → navigates to `route-offer-confirm` |
+| `src/constants/index.ts` | Added `NUS_LOCATIONS` (40+ NUS locations with categories), `ROUTE_OFFER_DURATIONS`, `ROUTE_OFFER_RADIUS_DEG` |
+
+### Broadcast flow
+```
+User taps "Going out?" FAB on map
+  → route-offer-confirm: pick destination, duration, tags, note → inserts route_offer row
+  → RouteOfferBanner appears in feed (shows destination + time left)
+  → Other users see RouteOfferCard in Broadcast tab → tap "Chat" → /dm/[userId]
+  → When a new quest is posted nearby, notify-route-offers Edge Function fires
+    → pushes notification to matching broadcasters
+```
+
+---
+
+## Map Overhaul — NUS Location Markers + Current Location
+
+**Goal:** Replace raw lat/lon cluster approach with fixed NUS location markers; add live user location features.
+
+### Architecture change
+The map was rebuilt around `NUS_LOCATIONS` (40+ fixed campus locations) rather than dynamic lat/lon clustering. Each quest is bucketed into its nearest NUS location; that location's marker shows the quest count.
+
+### Files modified
+| File | Change |
+|------|---------|
+| `app/(tabs)/map.tsx` | Restored to piggybagging-commit version (NUS location markers, `LocationMarker` interface, `QuestAccordion`, `MobileBottomSheet`, Reanimated side panel, collapsible filter chips); added current location features on top |
+| `src/components/map/MapEngine.tsx` | Uses `locationMarkers: LocationMarker[]` + `onLocationPress` props; added `showsUserLocation={true}` (native blue dot) + `mapRef` prop for programmatic `animateToRegion` |
+| `src/components/map/MapEngine.web.tsx` | Same `LocationMarker` interface with pigeon-maps; added controlled `center`/`zoom` state that auto-pans when `userLocation` prop changes; renders a custom blue dot marker |
+
+### Current location features added
+- Auto-requests `Location.requestForegroundPermissionsAsync()` on mount; pans map to user on grant
+- `Compass` button in search row → `handleLocateMe()` → `animateToRegion()` (native) / controlled center state (web)
+- Map pins made translucent: `rgba(124,58,237,0.65)` fill, `rgba(255,255,255,0.75)` border
+
+---
+
+## Feed & Map — Eligibility, Distance & UX Improvements
+
+### Show all quests (including ineligible)
+Previously, the feed filtered out quests the user couldn't accept. Now **all open quests are shown**; ineligible ones are visually distinguished instead of hidden.
+
+- **`feed.tsx`:** Removed `isEligible` filter from `filtered` computation
+- **`QuestCard.tsx`:** Already dimmed ineligible quests at `opacity: 0.55` with a red ineligibility banner — unchanged
+- **`QuestAccordion.tsx`:** Added eligibility check; ineligible quests get `opacity: 0.55`, red border tint, and a locked Accept button (grey background + `Lock` icon + `"Needs Explorer"` style text)
+
+### Distance display
+- **Feed (`QuestCard`):** Added `distance?: number` prop. Feed requests location permission on mount; computes Haversine distance per quest and passes it to `QuestCard`. Displayed inline next to `location_name` with a `Navigation` icon.
+- **Map quest list (`QuestAccordion`):** Distance shown inline in the chip row (tag · reward · distance) with a `Navigation` icon. Distance is computed once per cluster (user → NUS location marker) and passed as `clusterDistance` to all quests in that panel — not per individual quest, since they all share the same location marker.
+
+### Files modified
+| File | Change |
+|------|---------|
+| `src/components/QuestCard.tsx` | Added `distance?: number` prop; displayed next to location |
+| `src/components/map/QuestAccordion.tsx` | Added `distance?: number` (shown in chip row); added eligibility dimming + locked Accept button |
+| `src/components/map/MobileBottomSheet.tsx` | Replaced `distances: Record<string,number>` with `clusterDistance?: number`; forwarded to each `QuestAccordion` |
+| `app/(tabs)/map.tsx` | Computes single `clusterDistance` (user → marker) on `openPanel`; threads through web panel + mobile sheet |
+| `app/(tabs)/feed.tsx` | Added `expo-location` import + `userLocation` state + location request on mount; passes distance to `QuestCard` |
+
+---
+
+## Profile — Rank Title Display
+
+Added the rank title (`Wanderer` / `Explorer` / `Champion`) as a styled text below the display name in the profile hero card, coloured with the tier's brand colour. Previously only shown as a small badge.
+
+**File:** `app/(tabs)/profile.tsx`
+
+---
+
+## Auth — OTP Length Fix
+
+Supabase was configured to send 8-digit OTPs but the verify screen expected 6 digits. Fixed by changing the OTP length to 6 in **Supabase Dashboard → Authentication → Email → OTP length**. No app code changed.
+
+---
+
+## Stages 14–16 — Contacts, Reports, Price Suggestion, Semantic Search, Notification Preferences
+
+### Stage 14: Ripple Contacts & Report System
+
+#### New files
+| File | Purpose |
+|------|---------|
+| `src/hooks/useContacts.ts` | Fetch/add/remove contacts with profile join; `isContact()` helper |
+| `src/components/ReportModal.tsx` | Scrollable report type picker + description form; submits to `reports` table |
+| `src/components/three/ContactsScene.web.tsx` | R3F 3D orbital contacts graph (web) — 2 concentric rings, ripple pulse rings, connection lines |
+| `src/components/three/ContactsScene.native.tsx` | Reanimated 2D orbital contacts graph (native) — circular layout with animated orbs |
+| `app/contacts-graph.tsx` | Full-screen contacts graph screen with 3D/2D scene + flat contacts list |
+| `app/my-reports.tsx` | List of user's submitted reports with status badges |
+
+#### Modified files
+| File | Change |
+|------|--------|
+| `app/quest/[id].tsx` | Contact prompt after quest completion; flag icon in header to open ReportModal |
+| `app/(tabs)/profile.tsx` | Added "Contacts" section with count + "View Graph" button |
+| `app/(tabs)/settings.tsx` | Added My Reports nav row |
+
+### Stage 15: Price Suggestion + Semantic Search
+
+#### New files
+| File | Purpose |
+|------|---------|
+| `supabase/functions/embed-query/index.ts` | Edge Function: calls OpenAI `text-embedding-3-small`, returns embedding vector |
+
+#### Modified files
+| File | Change |
+|------|--------|
+| `app/(tabs)/post-quest.tsx` | `suggestPrice()` helper + inline suggestion chip with "Use" button in Reward step |
+| `app/(tabs)/feed.tsx` | AI toggle pill next to search bar; semantic search via `embed-query` → `search_quests` RPC; contacts boost in ranking |
+
+### Stage 16: Configurable Push Notification Preferences
+
+#### Modified files
+| File | Change |
+|------|--------|
+| `supabase/schema.sql` | Updated `notification_preferences` default with new keys (`new_quest`, `quest_complete`, `chat_message`, `route_offer_nearby`, `categories`) |
+| `src/types/database.ts` | Updated `NotificationPreferences` interface to match new schema |
+| `src/lib/notifications.ts` | `sendPushNotification` now accepts `notifType` + `recipientId`; fetches and enforces notification prefs before sending |
+| `app/(tabs)/settings.tsx` | Full notification preferences UI: toggle rows per event type + multi-select category chips; debounced save to Supabase |

@@ -28,7 +28,7 @@ create table if not exists profiles (
   push_token               text,
   completion_rate          numeric default 1.0,        -- fraction of accepted quests completed (0.0–1.0)
   avg_response_time_mins   numeric,                    -- average minutes from quest post to first action
-  notification_preferences jsonb default '{}',         -- per-category toggles + frequency setting
+  notification_preferences jsonb default '{"new_quest":true,"quest_accepted":true,"quest_complete":true,"chat_message":true,"route_offer_nearby":true,"flash_quests":true,"categories":["food","transport","errands","skills","social"]}', -- per-category toggles
   cross_rc_bonus           integer default 0,          -- count of cross-RC quest completions
   created_at               timestamptz default now()
 );
@@ -356,3 +356,11 @@ begin
   perform update_trust_score(user_id);
 end;
 $$;
+
+
+-- ============================================================
+-- Stage 16 migration: update notification_preferences default
+-- ============================================================
+ALTER TABLE profiles
+  ALTER COLUMN notification_preferences
+  SET DEFAULT '{"new_quest":true,"quest_accepted":true,"quest_complete":true,"chat_message":true,"route_offer_nearby":true,"flash_quests":true,"categories":["food","transport","errands","skills","social"]}'::jsonb;
