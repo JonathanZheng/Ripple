@@ -80,16 +80,17 @@ Go to **Database → Replication** and add `messages`, `quests`, `direct_message
 
 ### 5. Deploy the AI Edge Functions
 
-Four Edge Functions power the AI and notification features. Deploy all four:
+Five Edge Functions power the AI and notification features. Deploy all five:
 
 ```bash
 # Log in to Supabase CLI (no global install needed)
 npx supabase login
 
-# Deploy all four functions
+# Deploy all five functions
 npx supabase functions deploy process-quest --project-ref <your-project-ref>
 npx supabase functions deploy parse-quest --project-ref <your-project-ref> --no-verify-jwt
 npx supabase functions deploy chat-quest --project-ref <your-project-ref> --no-verify-jwt
+npx supabase functions deploy embed-query --project-ref <your-project-ref> --no-verify-jwt
 npx supabase functions deploy notify-route-offers --project-ref <your-project-ref>
 ```
 
@@ -109,7 +110,7 @@ OPENAI_API_KEY = <your-openai-key>
 npm start
 ```
 
-Scan the QR code with Expo Go, or press `i` for iOS simulator / `a` for Android emulator.
+Scan the QR code with Expo Go, or press `i` for iOS simulator / `a` for Android emulator. (Press `w` for the demo)
 
 > If you see module resolution errors on first run, clear the Metro cache: `npm start -- --clear`
 
@@ -120,33 +121,39 @@ Scan the QR code with Expo Go, or press `i` for iOS simulator / `a` for Android 
 ```
 app/                       # Routes (expo-router file-based routing)
   (auth)/                  # Welcome, sign-up, sign-in, verify screens
-  (tabs)/                  # Feed, leaderboard, post-quest, profile tabs
+  (tabs)/                  # Map, feed, post-quest, profile, rank, settings tabs
   quest/[id].tsx           # Quest detail, chat, completion
   route-offer-confirm.tsx  # "Going Out?" broadcast screen
   dm/[userId].tsx          # 1:1 direct message screen
+  contacts-graph.tsx       # 3D/2D orbital contacts graph screen
+  my-reports.tsx           # User's submitted reports
 assets/                    # Images, fonts, icons
 docs/                      # Documentation
   PLAN.md                  # Build plan
   JON_CHANGES.md           # Changelog
+  VINCENT_CHANGES.md       # Changelog
 src/                       # Shared source code
   components/              # Shared UI components
     QuestCard.tsx          # Quest card
     RouteOfferBanner.tsx   # Active broadcast banner in feed
     RouteOfferCard.tsx     # Scout card in Scouts feed tab
-    map/                   # Map-related components
-    ui/                    # Generic UI primitives
-  constants/               # RC names, tags, colours, trust tier config
-  hooks/                   # useSession, useProfile, useRouteOffer
-  lib/                     # supabase.ts client, geohash, notifications
+    ReportModal.tsx        # Report type picker modal
+    map/                   # MapEngine (native + web), MobileBottomSheet, QuestAccordion
+    three/                 # ContactsScene (native + web) — orbital contacts graph
+    ui/                    # Generic UI primitives (Button, Chip, Input, Badge, …)
+  constants/               # RC names, tags, colours, trust tier config, NUS locations
+  hooks/                   # useSession, useProfile, useRouteOffer, useContacts
+  lib/                     # supabase.ts, geohash, notifications, ranking, ThemeContext
   types/                   # TypeScript types for all DB tables
   global.css               # Tailwind/NativeWind base styles
 supabase/                  # Backend
   schema.sql               # Full DB schema — run in Supabase SQL Editor
   functions/
-    process-quest/         # Edge Function: GPT-4o tagging + embeddings
+    process-quest/         # Edge Function: GPT-4o auto-tagging + embeddings
     parse-quest/           # Edge Function: NL prompt → structured quest fields
     chat-quest/            # Edge Function: multi-turn conversational quest creation
-    notify-route-offers/   # Edge Function: push notifications to nearby broadcasters
+    embed-query/           # Edge Function: text-embedding-3-small for semantic search
+    notify-route-offers/   # Edge Function: push notifications to nearby scouts
 ```
 
 ---
@@ -180,6 +187,9 @@ The following are excluded by `.gitignore` and must be set up locally:
 | 8 — Notifications & Profile | ✅ | Push notifications, full profile screen |
 | 9 — Leaderboard & Gamification | ✅ | RC rankings, streaks, flash quests |
 | 10 — Route Offers | ✅ | "Going Out?" broadcasts, Broadcast feed tab, 1:1 DMs, nearby quest notifications |
+| 14 — Contacts & Reports | ✅ | Contacts graph, report system, flag icon on quests |
+| 15 — Price Suggestion & Semantic Search | ✅ | Per-tag price hints, pgvector semantic feed search |
+| 16 — Notification Preferences | ✅ | Per-category push notification toggles in settings |
 
 ---
 
