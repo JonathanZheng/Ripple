@@ -11,7 +11,7 @@ A mobile-first peer request platform for NUS UTown residents. Post quests, accep
 - **Frontend:** React Native (Expo SDK 55) + expo-router v5
 - **Styling:** nativewind v4 (Tailwind CSS for RN)
 - **Backend:** Supabase (Auth, PostgreSQL, Realtime, Storage, Edge Functions)
-- **AI:** OpenAI GPT-4o (conversational quest creation, piggyback matching, price suggestion) + `text-embedding-3-small` (semantic search via pgvector)
+- **AI:** OpenAI GPT-4o (conversational quest creation, auto-tagging) + text-embedding-3-small (semantic search via pgvector)
 - **Map:** react-native-maps (native) + pigeon-maps (web)
 
 ---
