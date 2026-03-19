@@ -37,16 +37,14 @@ import { Users, Package, Send, Zap, MapPin, X, Search } from 'lucide-react-nativ
 import type { QuestTag, FulfilmentMode } from '@/types/database';
 
 // ─── Price Suggestion ─────────────────────────────────────────────────────────
-const PRICE_CAP = 3;
 
 function suggestPrice(tag: QuestTag | ''): { min: number; max: number; label: string } | null {
-  const cap = (v: number) => Math.min(v, PRICE_CAP);
   switch (tag) {
-    case 'food':      return { min: cap(2), max: cap(5),  label: 'Quick errand' };
-    case 'transport': return { min: cap(3), max: cap(8),  label: 'Getting around' };
-    case 'skills':    return { min: cap(10), max: cap(25), label: 'Skills take time' };
-    case 'errands':   return { min: cap(3), max: cap(10), label: 'General help' };
-    case 'social':    return { min: 0, max: 0,  label: 'No payment for social' };
+    case 'food':      return { min: 1, max: 3, label: 'Quick errand' };
+    case 'transport': return { min: 1, max: 3, label: 'Getting around' };
+    case 'skills':    return { min: 1, max: 3, label: 'Skills take time' };
+    case 'errands':   return { min: 1, max: 3, label: 'General help' };
+    case 'social':    return { min: 0, max: 0, label: 'No payment for social' };
     default:          return null;
   }
 }
