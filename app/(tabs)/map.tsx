@@ -14,7 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Search, X, SlidersHorizontal, Navigation2, Compass } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/useSession';
@@ -24,7 +24,7 @@ import { Chip } from '@/components/ui/Chip';
 import { QuestAccordion } from '@/components/map/QuestAccordion';
 import { MobileBottomSheet } from '@/components/map/MobileBottomSheet';
 import MapEngine from '@/components/map/MapEngine';
-import type { LocationMarker } from '@/components/map/MapEngine';
+import type { LocationMarker, FocusPin } from '@/components/map/MapEngine';
 import type { Quest, Profile, QuestTag } from '@/types/database';
 import * as Location from 'expo-location';
 import MapView from 'react-native-maps';
@@ -65,6 +65,16 @@ function buildLocationMarkers(quests: Quest[]): LocationMarker[] {
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
+  const { focusLat, focusLng, focusLabel } = useLocalSearchParams<{
+    focusLat?: string;
+    focusLng?: string;
+    focusLabel?: string;
+  }>();
+
+  const focusPin: FocusPin | null =
+    focusLat && focusLng
+      ? { latitude: Number(focusLat), longitude: Number(focusLng), label: focusLabel ?? 'Shared location' }
+      : null;
 
   const { session } = useSession();
   const userId = session?.user?.id;
@@ -136,7 +146,15 @@ export default function MapScreen() {
 
   useFocusEffect(useCallback(() => {
     fetchQuests();
-  }, [fetchQuests]));
+    if (focusPin) {
+      setTimeout(() => {
+        mapRef.current?.animateToRegion(
+          { latitude: focusPin.latitude, longitude: focusPin.longitude, latitudeDelta: 0.008, longitudeDelta: 0.008 },
+          600,
+        );
+      }, 300);
+    }
+  }, [fetchQuests, focusPin?.latitude, focusPin?.longitude]));
 
   const now = new Date();
   const filteredQuests = quests.filter((q) => {
@@ -217,6 +235,7 @@ export default function MapScreen() {
           locationMarkers={locationMarkers}
           onLocationPress={openPanel}
           userLocation={userLocation}
+          focusPin={focusPin}
         />
       </View>
 

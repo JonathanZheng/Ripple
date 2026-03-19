@@ -10,7 +10,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Linking,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -28,7 +27,7 @@ import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { GlassView } from '@/components/ui/GlassView';
-import { DollarSign, Clock, MapPin, Send, Star, Camera, Navigation, Users, MessageCircle, Flag, UserPlus } from 'lucide-react-native';
+import { DollarSign, Clock, MapPin, Send, Star, Camera, Navigation, Navigation2, Users, MessageCircle, Flag, UserPlus } from 'lucide-react-native';
 import { ReportModal } from '@/components/ReportModal';
 import { Chip } from '@/components/ui/Chip';
 import { useTheme } from '@/lib/ThemeContext';
@@ -128,6 +127,54 @@ function StarPicker({ value, onChange }: { value: number; onChange: (n: number) 
         );
       })}
     </View>
+  );
+}
+
+function formatCoords(lat: number, lng: number) {
+  return `${Math.abs(lat).toFixed(5)}°${lat >= 0 ? 'N' : 'S'}  ${Math.abs(lng).toFixed(5)}°${lng >= 0 ? 'E' : 'W'}`;
+}
+
+function LocationBubble({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolean }) {
+  return (
+    <Pressable
+      onPress={() => router.push({ pathname: '/(tabs)/map', params: { focusLat: lat.toString(), focusLng: lng.toString(), focusLabel: 'Shared location' } } as any)}
+      style={{
+        maxWidth: '80%',
+        borderRadius: 18,
+        borderBottomRightRadius: isMe ? 4 : 18,
+        borderBottomLeftRadius: isMe ? 18 : 4,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: isMe ? 'rgba(124,58,237,0.5)' : 'rgba(255,255,255,0.12)',
+      }}
+    >
+      {/* Grid preview */}
+      <View style={{ height: 80, backgroundColor: isMe ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+        {[0.25, 0.5, 0.75].map((v) => (
+          <View key={`h${v}`} style={{ position: 'absolute', left: 0, right: 0, top: `${v * 100}%` as any, height: 1, backgroundColor: isMe ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.07)' }} />
+        ))}
+        {[0.25, 0.5, 0.75].map((v) => (
+          <View key={`v${v}`} style={{ position: 'absolute', top: 0, bottom: 0, left: `${v * 100}%` as any, width: 1, backgroundColor: isMe ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.07)' }} />
+        ))}
+        <View style={{ alignItems: 'center' }}>
+          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isMe ? '#7c3aed' : 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4 }}>
+            <MapPin size={16} color="#fff" strokeWidth={2.5} />
+          </View>
+          <View style={{ width: 2, height: 6, backgroundColor: isMe ? '#7c3aed' : 'rgba(255,255,255,0.4)', marginTop: -1 }} />
+        </View>
+      </View>
+      {/* Label row */}
+      <View style={{ paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, backgroundColor: isMe ? 'rgba(124,58,237,0.18)' : 'rgba(255,255,255,0.05)' }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Shared location</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 2 }}>{formatCoords(lat, lng)}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: isMe ? 'rgba(124,58,237,0.35)' : 'rgba(255,255,255,0.10)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 }}>
+          <Navigation2 size={11} color={isMe ? '#c4b5fd' : 'rgba(255,255,255,0.6)'} />
+          <Text style={{ color: isMe ? '#c4b5fd' : 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '600' }}>Ripple Map</Text>
+        </View>
+      </View>
+    </Pressable>
   );
 }
 
@@ -625,30 +672,26 @@ export default function QuestDetail() {
             {senderProfile.display_name}
           </Text>
         )}
-        <View style={{
-          maxWidth: '80%',
-          backgroundColor: isMe ? 'rgba(124,58,237,0.70)' : colors.surface2,
-          borderRadius: 18,
-          borderBottomRightRadius: isMe ? 4 : 18,
-          borderBottomLeftRadius: isMe ? 18 : 4,
-          overflow: 'hidden',
-        }}>
-          {(msg as any).type === 'image' && (msg as any).image_url ? (
-            <Image source={{ uri: (msg as any).image_url }} style={{ width: 200, height: 150 }} resizeMode="cover" />
-          ) : (msg as any).type === 'location' && (msg as any).latitude ? (
-            <Pressable
-              style={{ paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}
-              onPress={() => Linking.openURL(`https://maps.google.com/?q=${(msg as any).latitude},${(msg as any).longitude}`)}
-            >
-              <Navigation size={16} color="#ffffff" strokeWidth={2} />
-              <Text style={{ color: '#ffffff', fontSize: 14, lineHeight: 20, textDecorationLine: 'underline' }}>View Location</Text>
-            </Pressable>
-          ) : (
-            <View style={{ paddingHorizontal: 14, paddingVertical: 10 }}>
-              <Text style={{ color: '#ffffff', fontSize: 14, lineHeight: 20 }}>{msg.content}</Text>
-            </View>
-          )}
-        </View>
+        {(msg as any).type === 'location' && (msg as any).latitude ? (
+          <LocationBubble lat={(msg as any).latitude} lng={(msg as any).longitude} isMe={isMe} />
+        ) : (
+          <View style={{
+            maxWidth: '80%',
+            backgroundColor: isMe ? 'rgba(124,58,237,0.70)' : colors.surface2,
+            borderRadius: 18,
+            borderBottomRightRadius: isMe ? 4 : 18,
+            borderBottomLeftRadius: isMe ? 18 : 4,
+            overflow: 'hidden',
+          }}>
+            {(msg as any).type === 'image' && (msg as any).image_url ? (
+              <Image source={{ uri: (msg as any).image_url }} style={{ width: 200, height: 150 }} resizeMode="cover" />
+            ) : (
+              <View style={{ paddingHorizontal: 14, paddingVertical: 10 }}>
+                <Text style={{ color: '#ffffff', fontSize: 14, lineHeight: 20 }}>{msg.content}</Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
     );
   };
