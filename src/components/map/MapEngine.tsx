@@ -52,43 +52,30 @@ export default function MapEngine({
         <UrlTile urlTemplate={CARTO_DARK_TILE} maximumZ={19} flipY={false} />
       )}
 
-      {/* Quest cluster markers */}
-      {locationMarkers.map((marker) => (
+      {/* Quest cluster markers — only render when quests exist at this location */}
+      {locationMarkers.filter((m) => m.quests.length > 0).map((marker) => (
         <Marker
           key={marker.name}
           coordinate={{ latitude: marker.latitude, longitude: marker.longitude }}
           tracksViewChanges={false}
           onPress={() => onLocationPress(marker)}
         >
-          {marker.quests.length > 0 ? (
-            <View
-              style={{
-                backgroundColor: 'rgba(124,58,237,0.65)',
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                borderWidth: 2.5,
-                borderColor: 'rgba(255,255,255,0.75)',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>
-                {marker.quests.length}
-              </Text>
-            </View>
-          ) : (
-            <View
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: 5,
-                backgroundColor: 'rgba(255,255,255,0.20)',
-                borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.35)',
-              }}
-            />
-          )}
+          <View
+            style={{
+              backgroundColor: 'rgba(124,58,237,0.65)',
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              borderWidth: 2.5,
+              borderColor: 'rgba(255,255,255,0.75)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>
+              {marker.quests.length}
+            </Text>
+          </View>
         </Marker>
       ))}
 

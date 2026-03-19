@@ -327,7 +327,7 @@ export default function MapScreen() {
               <Chip
                 label={item}
                 selected={tagFilter === item}
-                color={(TAG_COLOURS as any)[item]}
+                color={item === 'all' ? '#ef4444' : (TAG_COLOURS as any)[item]}
                 onPress={() => setTagFilter(item)}
                 style={{
                   backgroundColor: 'rgba(18,18,20,0.82)',

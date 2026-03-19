@@ -37,12 +37,15 @@ import { Users, Package, Send, Zap, MapPin, X, Search } from 'lucide-react-nativ
 import type { QuestTag, FulfilmentMode } from '@/types/database';
 
 // ─── Price Suggestion ─────────────────────────────────────────────────────────
+const PRICE_CAP = 3;
+
 function suggestPrice(tag: QuestTag | ''): { min: number; max: number; label: string } | null {
+  const cap = (v: number) => Math.min(v, PRICE_CAP);
   switch (tag) {
-    case 'food':      return { min: 2, max: 5,  label: 'Quick errand' };
-    case 'transport': return { min: 3, max: 8,  label: 'Getting around' };
-    case 'skills':    return { min: 10, max: 25, label: 'Skills take time' };
-    case 'errands':   return { min: 3, max: 10, label: 'General help' };
+    case 'food':      return { min: cap(2), max: cap(5),  label: 'Quick errand' };
+    case 'transport': return { min: cap(3), max: cap(8),  label: 'Getting around' };
+    case 'skills':    return { min: cap(10), max: cap(25), label: 'Skills take time' };
+    case 'errands':   return { min: cap(3), max: cap(10), label: 'General help' };
     case 'social':    return { min: 0, max: 0,  label: 'No payment for social' };
     default:          return null;
   }
@@ -143,10 +146,10 @@ function ToggleLabel({ label, isActive }: { label: string; isActive: boolean }) 
 }
 
 function ModeToggle({ value, onChange }: { value: 'ai' | 'manual'; onChange: (m: 'ai' | 'manual') => void }) {
-  const progress = useSharedValue(value === 'ai' ? 0 : 1);
+  const progress = useSharedValue(value === 'manual' ? 0 : 1);
 
   useEffect(() => {
-    progress.value = withTiming(value === 'ai' ? 0 : 1, TOGGLE_ANIM);
+    progress.value = withTiming(value === 'manual' ? 0 : 1, TOGGLE_ANIM);
   }, [value]);
 
   const pillStyle = useAnimatedStyle(() => ({
@@ -172,7 +175,7 @@ function ModeToggle({ value, onChange }: { value: 'ai' | 'manual'; onChange: (m:
         backgroundColor: '#ffffff',
         borderRadius: 999,
       }, pillStyle]} />
-      {(['ai', 'manual'] as const).map((m) => (
+      {(['manual', 'ai'] as const).map((m) => (
         <Pressable
           key={m}
           onPress={() => onChange(m)}
@@ -188,7 +191,7 @@ function ModeToggle({ value, onChange }: { value: 'ai' | 'manual'; onChange: (m:
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function PostQuest() {
   const insets = useSafeAreaInsets();
-  const [postMode, setPostMode] = useState<'ai' | 'manual'>('ai');
+  const [postMode, setPostMode] = useState<'ai' | 'manual'>('manual');
 
   // ── AI chat state ──────────────────────────────────────────────────────────
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
