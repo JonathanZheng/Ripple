@@ -12,6 +12,8 @@ export interface LocationMarker {
 export interface MapEngineProps {
   locationMarkers: LocationMarker[];
   onLocationPress: (marker: LocationMarker) => void;
+  userLocation?: [number, number] | null;
+  mapRef?: React.RefObject<MapView>;
 }
 
 const CARTO_DARK_TILE = 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
@@ -23,12 +25,15 @@ const UTOWN_REGION = {
   longitudeDelta: 0.022,
 };
 
-export default function MapEngine({ locationMarkers, onLocationPress }: MapEngineProps) {
+export default function MapEngine({ locationMarkers, onLocationPress, mapRef }: MapEngineProps) {
   return (
     <MapView
+      ref={mapRef}
       style={{ flex: 1 }}
       initialRegion={UTOWN_REGION}
       mapType={Platform.OS === 'android' ? 'none' : 'standard'}
+      showsUserLocation={true}
+      showsMyLocationButton={false}
     >
       {Platform.OS === 'android' && (
         <UrlTile urlTemplate={CARTO_DARK_TILE} maximumZ={19} flipY={false} />
@@ -44,12 +49,12 @@ export default function MapEngine({ locationMarkers, onLocationPress }: MapEngin
           {marker.quests.length > 0 ? (
             <View
               style={{
-                backgroundColor: '#7c3aed',
+                backgroundColor: 'rgba(124,58,237,0.65)',
                 width: 36,
                 height: 36,
                 borderRadius: 18,
                 borderWidth: 2.5,
-                borderColor: '#fff',
+                borderColor: 'rgba(255,255,255,0.75)',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}

@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { useTheme } from '@/lib/ThemeContext';
-import { Zap, Clock, MapPin, Users, Navigation2 } from 'lucide-react-native';
+import { Zap, Clock, MapPin, Users, Navigation2, Navigation } from 'lucide-react-native';
 import type { Quest, TrustTier } from '@/types/database';
 
 interface Props {
@@ -16,6 +16,7 @@ interface Props {
   userTier: TrustTier;
   from?: string;
   isOnYourWay?: boolean;
+  distance?: number;
 }
 
 
@@ -51,7 +52,7 @@ function FlashCountdown({ expiresAt }: { expiresAt: string }) {
   );
 }
 
-export function QuestCard({ quest, userTier, from, isOnYourWay }: Props) {
+export function QuestCard({ quest, userTier, from, isOnYourWay, distance }: Props) {
   const eligible = isEligible(quest, userTier);
   const ineligReason = ineligibilityReason(quest, userTier);
   const deadlineDate = new Date(quest.deadline);
@@ -136,12 +137,24 @@ export function QuestCard({ quest, userTier, from, isOnYourWay }: Props) {
             <Text style={{ color: '#3b82f6', fontSize: 11, fontWeight: '600' }}>On your way</Text>
           </View>
         )}
-        {quest.location_name && (
+        {(quest.location_name || distance != null) && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
-            <MapPin size={11} color={colors.textFaint} strokeWidth={2} />
-            <Text style={{ color: colors.textFaint, fontSize: 11 }} numberOfLines={1}>
-              {quest.location_name}
-            </Text>
+            {quest.location_name && (
+              <>
+                <MapPin size={11} color={colors.textFaint} strokeWidth={2} />
+                <Text style={{ color: colors.textFaint, fontSize: 11 }} numberOfLines={1}>
+                  {quest.location_name}
+                </Text>
+              </>
+            )}
+            {distance != null && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: quest.location_name ? 6 : 0 }}>
+                <Navigation size={11} color={colors.textFaint} strokeWidth={2} />
+                <Text style={{ color: colors.textFaint, fontSize: 11, fontWeight: '600' }}>
+                  {distance < 1 ? `${Math.round(distance * 1000)} m` : `${distance.toFixed(1)} km`}
+                </Text>
+              </View>
+            )}
           </View>
         )}
       </View>

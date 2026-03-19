@@ -150,8 +150,11 @@ export default function ProfileScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 }}>
               <Avatar name={profile.display_name} size="lg" tierColor={tierConfig.colour} />
               <View style={{ flex: 1 }}>
-                <Text style={{ color: '#ffffff', fontSize: 19, fontWeight: '700', letterSpacing: -0.5, marginBottom: 3 }}>
+                <Text style={{ color: '#ffffff', fontSize: 19, fontWeight: '700', letterSpacing: -0.5, marginBottom: 2 }}>
                   {profile.display_name}
+                </Text>
+                <Text style={{ color: tierConfig.colour, fontSize: 12, fontWeight: '700', letterSpacing: 0.2, marginBottom: 4 }}>
+                  {tierConfig.label}
                 </Text>
                 <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, marginBottom: 8 }}>
                   {profile.rc}

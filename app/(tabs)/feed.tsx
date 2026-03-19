@@ -8,6 +8,7 @@ import {
   LayoutChangeEvent,
 } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as Location from 'expo-location';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -32,7 +33,6 @@ import { QUEST_TAGS, TAG_COLOURS, ROUTE_OFFER_RADIUS_DEG } from '@/constants';
 import { Search, Layers, SlidersHorizontal, Navigation2 } from 'lucide-react-native';
 import {
   rankFeed,
-  isEligible,
   initialSessionBoosts,
   incrementSessionBoost,
   type AcceptedQuestSummary,
@@ -102,6 +102,14 @@ function deadlineInRange(deadline: string, filter: DeadlineFilter): boolean {
 const DROPDOWN_HEIGHT = 280;
 const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 50 };
 
+function getDist(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export default function Feed() {
   const insets = useSafeAreaInsets();
   const { session } = useSession();
@@ -149,6 +157,7 @@ export default function Feed() {
     setFeedMode(mode);
   }
 
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [acceptHistory, setAcceptHistory] = useState<AcceptedQuestSummary[]>([]);
   const [sessionBoosts, setSessionBoosts] = useState<SessionTagBoosts>(initialSessionBoosts());
   const [seenCounts, setSeenCounts] = useState<Map<string, number>>(new Map());
@@ -218,6 +227,16 @@ export default function Feed() {
   }, []);
 
   useEffect(() => {
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const loc = await Location.getCurrentPositionAsync({});
+        setUserLocation([loc.coords.latitude, loc.coords.longitude]);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
     if (feedMode !== 'broadcast') return;
     loadBroadcast();
   }, [feedMode]);
@@ -250,8 +269,6 @@ export default function Feed() {
   const filtered = quests.filter((q) => {
     if (new Date(q.deadline) <= now) return false;
     if (q.is_flash && q.flash_expires_at && new Date(q.flash_expires_at) <= now) return false;
-    // Always show the poster's own quests regardless of tier eligibility
-    if (!q.is_flash && q.poster_id !== userId && !isEligible(q, userTier)) return false;
     if (tagFilter !== 'all' && q.tag !== tagFilter) return false;
     if (modeFilter !== 'all' && q.fulfilment_mode !== modeFilter) return false;
     if (questTypeFilter !== 'all' && (q as any).quest_type !== questTypeFilter) return false;
@@ -492,6 +509,11 @@ export default function Feed() {
               userTier={userTier}
               from="feed"
               isOnYourWay={onYourWayIds.has(item.id)}
+              distance={
+                userLocation && item.latitude != null && item.longitude != null
+                  ? getDist(userLocation[0], userLocation[1], item.latitude, item.longitude)
+                  : undefined
+              }
             />
           )}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 100 }}

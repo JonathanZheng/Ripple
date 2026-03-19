@@ -6,10 +6,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { ChevronDown, MapPin, Calendar, ExternalLink, Zap } from 'lucide-react-native';
+import { ChevronDown, MapPin, Calendar, ExternalLink, Zap, Lock, Navigation } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-import { TAG_COLOURS } from '@/constants';
-import type { Quest, Profile } from '@/types/database';
+import { TAG_COLOURS, TRUST_TIER_CONFIG } from '@/constants';
+import { isEligible, ineligibilityReason } from '@/lib/ranking';
+import type { Quest, Profile, TrustTier } from '@/types/database';
 
 const DETAILS_MAX_HEIGHT = 480; // generous ceiling — content never exceeds this
 const ANIM = { duration: 240, easing: Easing.out(Easing.cubic) };
@@ -21,6 +22,7 @@ interface QuestAccordionProps {
   onToggle: () => void;
   posterProfile: Profile | null;
   isLoadingPoster: boolean;
+  distance?: number;
 }
 
 function formatDeadline(deadline: string | null) {
@@ -36,8 +38,12 @@ export function QuestAccordion({
   onToggle,
   posterProfile,
   isLoadingPoster,
+  distance,
 }: QuestAccordionProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const eligible = isEligible(quest, userTier as TrustTier);
+  const ineligReason = ineligibilityReason(quest, userTier as TrustTier);
+  const tierLabel = TRUST_TIER_CONFIG[userTier as TrustTier]?.label ?? userTier;
 
   // When the accordion collapses, also hide details
   const effectiveShowDetails = isExpanded && showDetails;
@@ -71,8 +77,9 @@ export function QuestAccordion({
         borderRadius: 14,
         backgroundColor: 'rgba(255,255,255,0.05)',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
+        borderColor: eligible ? 'rgba(255,255,255,0.08)' : 'rgba(239,68,68,0.18)',
         overflow: 'hidden',
+        opacity: eligible ? 1 : 0.55,
       }}
     >
       {/* ── Summary row (always visible) ── */}
@@ -91,7 +98,7 @@ export function QuestAccordion({
           >
             {quest.title}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
             <View
               style={{
                 backgroundColor: tagColor + '33',
@@ -134,6 +141,14 @@ export function QuestAccordion({
               >
                 <Zap size={10} color="#f59e0b" fill="#f59e0b" />
                 <Text style={{ color: '#f59e0b', fontSize: 10, fontWeight: '700' }}>FLASH</Text>
+              </View>
+            )}
+            {distance != null && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <Navigation size={10} color="rgba(255,255,255,0.35)" strokeWidth={2} />
+                <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '600' }}>
+                  {distance < 1 ? `${Math.round(distance * 1000)} m` : `${distance.toFixed(1)} km`}
+                </Text>
               </View>
             )}
           </View>
@@ -181,7 +196,7 @@ export function QuestAccordion({
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={handleAccept}
+            onPress={eligible ? handleAccept : undefined}
             style={{
               flex: 1,
               flexDirection: 'row',
@@ -190,11 +205,16 @@ export function QuestAccordion({
               gap: 6,
               paddingVertical: 10,
               borderRadius: 9,
-              backgroundColor: '#7c3aed',
+              backgroundColor: eligible ? '#7c3aed' : 'rgba(255,255,255,0.07)',
+              borderWidth: eligible ? 0 : 1,
+              borderColor: 'rgba(255,255,255,0.12)',
             }}
-            activeOpacity={0.8}
+            activeOpacity={eligible ? 0.8 : 1}
           >
-            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>Accept Quest</Text>
+            {!eligible && <Lock size={12} color="rgba(255,255,255,0.35)" strokeWidth={2.5} />}
+            <Text style={{ color: eligible ? '#fff' : 'rgba(255,255,255,0.35)', fontSize: 13, fontWeight: '700' }}>
+              {eligible ? 'Accept Quest' : `Needs ${ineligReason ? ineligReason.split(' ')[0] : 'higher rank'}`}
+            </Text>
           </TouchableOpacity>
         </View>
       </Animated.View>

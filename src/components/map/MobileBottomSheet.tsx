@@ -23,6 +23,7 @@ interface MobileBottomSheetProps {
   loadingPosters: Set<string>;
   onClose: () => void;
   userTier: string;
+  clusterDistance?: number;
 }
 
 export function MobileBottomSheet({
@@ -34,6 +35,7 @@ export function MobileBottomSheet({
   loadingPosters,
   onClose,
   userTier,
+  clusterDistance,
 }: MobileBottomSheetProps) {
   const insets = useSafeAreaInsets();
   const translateY = useSharedValue(visible ? 0 : SNAP_CLOSED);
@@ -124,6 +126,7 @@ export function MobileBottomSheet({
             onToggle={() => onQuestToggle(quest.id)}
             posterProfile={posterProfiles[quest.poster_id] ?? null}
             isLoadingPoster={loadingPosters.has(quest.poster_id)}
+            distance={clusterDistance}
           />
         ))}
       </ScrollView>
