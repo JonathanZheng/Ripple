@@ -166,3 +166,4 @@ export function ReportModal({ visible, reportedUserId, questId, onClose }: Repor
     </Modal>
   );
 }
+ 

@@ -88,3 +88,4 @@ export function Badge({ variant = 'default', value, color, style }: BadgeProps) 
     </View>
   );
 }
+ 

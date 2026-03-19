@@ -127,3 +127,4 @@ export function RouteOfferCard({ offer, currentUserId }: Props) {
     </Card>
   );
 }
+ 

@@ -223,3 +223,4 @@ export function ContactsScene({ contacts }: { contacts: ContactWithProfile[] }) 
     </Canvas>
   );
 }
+ 

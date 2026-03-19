@@ -93,3 +93,4 @@ Generate a concise title and an elaborated description from the prompt.`,
     return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 });
   }
 });
+ 

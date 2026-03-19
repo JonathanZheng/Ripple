@@ -111,3 +111,4 @@ Given a quest title and description, return a JSON object with:
     return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 });
   }
 });
+ 

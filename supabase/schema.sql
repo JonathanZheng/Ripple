@@ -364,3 +364,4 @@ $$;
 ALTER TABLE profiles
   ALTER COLUMN notification_preferences
   SET DEFAULT '{"new_quest":true,"quest_accepted":true,"quest_complete":true,"chat_message":true,"route_offer_nearby":true,"flash_quests":true,"categories":["food","transport","errands","skills","social"]}'::jsonb;
+ 

@@ -70,3 +70,4 @@ export function Avatar({ name, size = 'md', tierColor, imageUrl, style }: Avatar
     </View>
   );
 }
+ 

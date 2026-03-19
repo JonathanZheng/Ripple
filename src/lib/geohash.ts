@@ -4,3 +4,4 @@ import ngeohash from 'ngeohash';
 export function encodeGeohash(lat: number, lng: number): string {
   return ngeohash.encode(lat, lng, 6);
 }
+ 

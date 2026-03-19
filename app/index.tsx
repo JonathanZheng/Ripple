@@ -15,3 +15,4 @@ export default function Index() {
 
   return <Redirect href={session ? '/(tabs)/feed' : '/(auth)'} />;
 }
+ 

@@ -78,3 +78,4 @@ export function Chip({ label, selected, onPress, color, style }: ChipProps) {
     </AnimatedPressable>
   );
 }
+ 

@@ -154,3 +154,4 @@ export function ContactsScene({ contacts }: { contacts: ContactWithProfile[] }) 
     </View>
   );
 }
+ 

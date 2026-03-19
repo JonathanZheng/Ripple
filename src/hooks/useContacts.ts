@@ -61,3 +61,4 @@ export function useContacts(userId: string | undefined) {
 
   return { contacts, loading, addContact, removeContact, isContact, refetch: fetchContacts };
 }
+ 

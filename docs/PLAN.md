@@ -806,3 +806,4 @@ $$ LANGUAGE plpgsql;
 - **useFocusEffect pattern:** Always inline the async function — `useFocusEffect(useCallback(() => { async function load() {...} load(); }, [deps]))`.
 - **geohash precision.** Use precision 6 (≈1.2km × 0.6km cells) for proximity queries.
 - **NL quest creation is the primary path.** The manual form is the fallback. Optimise the AI mode UX first.
+ 

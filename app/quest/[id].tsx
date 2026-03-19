@@ -956,3 +956,4 @@ export default function QuestDetail() {
     </View>
   );
 }
+ 

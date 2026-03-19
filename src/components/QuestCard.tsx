@@ -236,3 +236,4 @@ export function QuestCard({ quest, userTier, from, isOnYourWay, distance }: Prop
     </Card>
   );
 }
+ 

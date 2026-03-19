@@ -118,3 +118,4 @@ export const NUS_LOCATIONS: {
 
 /** @deprecated use NUS_LOCATIONS */
 export const RC_LOCATIONS = NUS_LOCATIONS;
+ 

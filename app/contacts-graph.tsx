@@ -92,3 +92,4 @@ function listContacts(contacts: ReturnType<typeof useContacts>['contacts'], load
     );
   });
 }
+ 

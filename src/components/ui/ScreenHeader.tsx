@@ -70,3 +70,4 @@ export function ScreenHeader({ title, subtitle, rightAction, backAction, onBack 
     </View>
   );
 }
+ 

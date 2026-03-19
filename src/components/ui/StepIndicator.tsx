@@ -25,3 +25,4 @@ export function StepIndicator({ steps, currentIndex }: StepIndicatorProps) {
     </View>
   );
 }
+ 

@@ -45,4 +45,4 @@ This markdown file summarizes the transformation of your codebase from having **
 ### Files Modified/Created:
 - `app/(tabs)/map.tsx` (The core map system)
 - `app/(tabs)/post-quest.tsx` (Integrated the Map Picker button)
-- `src/components/QuestCard.tsx` (Prop adjustments for map usage)
+- `src/components/QuestCard.tsx` (Prop adjustments for map usage) 

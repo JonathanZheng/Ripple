@@ -196,3 +196,4 @@ The following are excluded by `.gitignore` and must be set up locally:
 ## Residential Colleges
 
 Ripple is built for NUS UTown's 7++ RCs: **Acacia, CAPT, NUSC, RC4, RVRC, Tembusu, UTR**
+ 

@@ -529,3 +529,4 @@ Supabase was configured to send 8-digit OTPs but the verify screen expected 6 di
 | `src/types/database.ts` | Updated `NotificationPreferences` interface to match new schema |
 | `src/lib/notifications.ts` | `sendPushNotification` now accepts `notifType` + `recipientId`; fetches and enforces notification prefs before sending |
 | `app/(tabs)/settings.tsx` | Full notification preferences UI: toggle rows per event type + multi-select category chips; debounced save to Supabase |
+ 
