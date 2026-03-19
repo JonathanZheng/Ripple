@@ -27,6 +27,7 @@ export interface RouteOfferInsert {
   note?: string | null;
   expires_at: string;
 }
+
 export type QuestStatus = 'open' | 'in_progress' | 'completed' | 'expired' | 'disputed';
 export type QuestTag = 'food' | 'transport' | 'social' | 'skills' | 'errands';
 export type FulfilmentMode = 'meetup' | 'dropoff';
@@ -143,6 +144,9 @@ export interface DirectMessage {
   sender_id: string;
   recipient_id: string;
   content: string;
+  message_type: MessageType;
+  latitude: number | null;
+  longitude: number | null;
   created_at: string;
 }
 
@@ -239,6 +243,19 @@ export type Database = {
           content: string;
           type?: MessageType;
           image_url?: string | null;
+          latitude?: number | null;
+          longitude?: number | null;
+        };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      direct_messages: {
+        Row: DirectMessage;
+        Insert: {
+          sender_id: string;
+          recipient_id: string;
+          content: string;
+          message_type?: MessageType;
           latitude?: number | null;
           longitude?: number | null;
         };
