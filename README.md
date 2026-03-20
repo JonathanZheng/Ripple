@@ -1,8 +1,8 @@
 # Ripple
 
-**Small actions. Big community.**
+**Small actions. Big community. Every ripple matters.**
 
-A mobile-first peer request platform for NUS UTown residents. Post quests, accept quests, build community — one small act at a time.
+A mobile-first peer request platform for NUS UTown residents. Post quests, accept quests, build community — one small act at a time. Check out our demo [here](https://youtu.be/RGKiG1W3VHE)!
 
 ---
 
