@@ -57,9 +57,9 @@
         }
       ]
     ],
+    "baseUrl": "/Ripple",
     "experiments": {
-      "typedRoutes": true,
-      "baseUrl": "/Ripple"
+      "typedRoutes": true
     },
     "extra": {
       "router": {},
