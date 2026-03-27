@@ -8,6 +8,7 @@ import {
   Pressable,
   TouchableOpacity,
   TextInput,
+  Alert,
 } from 'react-native';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
@@ -24,7 +25,9 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { encodeGeohash } from '@/lib/geohash';
-import { QUEST_TAGS, TAG_COLOURS, NUS_LOCATIONS } from '@/constants';
+import { QUEST_TAGS, TAG_COLOURS, NUS_LOCATIONS, STRIKE_THRESHOLDS } from '@/constants';
+import { useSession } from '@/hooks/useSession';
+import { useProfile } from '@/hooks/useProfile';
 import { useTheme } from '@/lib/ThemeContext';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Card } from '@/components/ui/Card';
@@ -189,6 +192,8 @@ function ModeToggle({ value, onChange }: { value: 'ai' | 'manual'; onChange: (m:
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function PostQuest() {
   const insets = useSafeAreaInsets();
+  const { session } = useSession();
+  const { profile } = useProfile(session?.user.id);
   const [postMode, setPostMode] = useState<'ai' | 'manual'>('manual');
 
   // ── AI chat state ──────────────────────────────────────────────────────────
@@ -206,6 +211,16 @@ export default function PostQuest() {
 
   const scrollRef = useRef<ScrollView>(null);
   const shouldReset = useRef(false);
+
+  useFocusEffect(useCallback(() => {
+    if (profile && profile.strikes >= STRIKE_THRESHOLDS.suspend) {
+      Alert.alert(
+        'Posting Suspended',
+        `You have ${profile.strikes} strike${profile.strikes !== 1 ? 's' : ''}. Quest posting is suspended pending review. Contact your RC admin or Ripple support if you believe this is an error.`,
+        [{ text: 'OK', onPress: () => router.replace('/(tabs)/feed') }],
+      );
+    }
+  }, [profile]));
 
   useFocusEffect(useCallback(() => {
     if (!shouldReset.current) return;
@@ -329,6 +344,10 @@ export default function PostQuest() {
 
   // ─── AI: Submit confirmed quest ────────────────────────────────────────────
   async function handleAiSubmit() {
+    if (profile && profile.strikes >= STRIKE_THRESHOLDS.suspend) {
+      setError('Quest posting is suspended due to active strikes.');
+      return;
+    }
     const f = collectedFields;
     await submitQuest({
       title: f.title ?? '',
@@ -343,6 +362,10 @@ export default function PostQuest() {
 
   // ─── Manual: Submit ────────────────────────────────────────────────────────
   async function handleSubmit() {
+    if (profile && profile.strikes >= STRIKE_THRESHOLDS.suspend) {
+      setError('Quest posting is suspended due to active strikes.');
+      return;
+    }
     if (!title.trim()) { setError('Quest title is required.'); return; }
     if (!description.trim() || description.length < 10) { setError('Description must be at least 10 characters.'); return; }
     if (!deadlineLabel) { setError('Please select a deadline.'); return; }

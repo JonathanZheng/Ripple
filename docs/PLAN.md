@@ -37,7 +37,7 @@ The core loop: **Post a quest → AI structures and broadcasts it → a neighbou
 What makes Ripple different from a group chat or notice board:
 
 - **AI-first quest creation** — don't fill out a form. Just type what you need in plain language. GPT-4o extracts the item, price, fulfilment mode, location, and deadline automatically via a conversational interface. The quest is live in seconds.
-- **AI piggyback matching** — Ripple doesn't wait for someone to browse. It detects users who are already heading toward a quest location based on real-time GPS + movement vector, and pings them. Fulfilment by coincidence, not by hire.
+- **AI piggyback matching** — Ripple doesn't wait for someone to browse. It matches users who have broadcast a route offer near a quest location, and pings them. Fulfilment by coincidence, not by hire.
 - **Semantic search** — type what you want to help with in natural language and AI matches you to the most relevant quests, not just keyword hits.
 - **Structured requests** with clear descriptions, deadlines, reward amounts, and fulfilment modes (drop-off vs meet-up vs social).
 - **Social quests** — study buddies, event partners, workout companions. No payment changes hands; the "reward" is the shared experience.
@@ -78,7 +78,7 @@ What makes Ripple different from a group chat or notice board:
 ### Phase C: Quest Discovery & AI Matching
 
 11. **AI Piggyback Matching (proactive — the core differentiator).** Ripple's matching engine combines:
-    - Real-time location + movement vector — the user's current geohash and direction of travel.
+    - Route offer destination — the user's broadcast destination and proximity radius (~330m).
     - Quest embeddings — semantic similarity between the user's skill profile / past quest history and active quests.
     - Contextual signals — time of day, quest urgency, quest category match with user's declared skills.
     - 3-step scoring: (1) geohash proximity filter, (2) cosine similarity on embeddings, (3) GPT-4o micro-call re-ranking top 5 candidates with contextual reasoning.
@@ -142,7 +142,7 @@ What makes Ripple different from a group chat or notice board:
 | Component | Technology | What It Does |
 |-----------|-----------|--------------|
 | Conversational Quest Creation | GPT-4o (`chat-quest` Edge Function) | Multi-turn chat: user describes quest, GPT-4o extracts structured fields and asks targeted follow-ups |
-| AI Piggyback Matching | GPT-4o + pgvector + geohash + movement vector | 3-step scoring: (1) geohash proximity filter, (2) cosine similarity on embeddings, (3) GPT-4o re-ranking micro-call. Detects users already heading toward a quest location and pings them |
+| AI Piggyback Matching | pgvector + geohash radius check | Route offer proximity: quests posted within ~330m of a broadcaster's destination trigger a push notification to that broadcaster |
 | Semantic Search | `text-embedding-3-small` + pgvector | Natural language search over quest embeddings |
 | AI Price Suggestion | GPT-4o | Analyses quest description + historical pricing data to suggest a fair cash reward when the user doesn't specify one |
 

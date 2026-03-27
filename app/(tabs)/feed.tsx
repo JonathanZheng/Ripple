@@ -201,7 +201,7 @@ export default function Feed() {
   async function fetchHistory(userId: string): Promise<AcceptedQuestSummary[]> {
     const { data } = await supabase
       .from('quests')
-      .select('tag, created_at, location_name')
+      .select('tag, created_at, location_name, fulfilment_mode, reward_amount')
       .eq('acceptor_id', userId)
       .in('status', ['completed', 'in_progress'])
       .order('created_at', { ascending: false })

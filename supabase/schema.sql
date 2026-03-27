@@ -177,7 +177,12 @@ create policy "Open quests viewable by all authenticated users"
   on quests for select to authenticated using (true);
 
 create policy "Authenticated users can create quests"
-  on quests for insert to authenticated with check (auth.uid() = poster_id);
+  on quests for insert to authenticated
+  with check (
+    auth.uid() = poster_id
+    and coalesce((select strikes from profiles where id = auth.uid()), 0) < 2
+    -- Threshold mirrors STRIKE_THRESHOLDS.suspend = 2 (src/constants/index.ts)
+  );
 
 create policy "Poster can update their own quest"
   on quests for update to authenticated
