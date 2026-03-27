@@ -216,31 +216,51 @@ export default function QuestDetail() {
   }, []);
 
   const fetchData = useCallback(async () => {
-    if (!id || !userId) return;
-    const [questRes, myProfileRes] = await Promise.all([
-      supabase.from('quests').select('*').eq('id', id).single(),
-      supabase.from('profiles').select('*').eq('id', userId).single(),
-    ]);
-    if (questRes.error || !questRes.data) { setLoading(false); return; }
-    const q = questRes.data as Quest;
-    setQuest(q);
-    if (myProfileRes.data) setMyProfile(myProfileRes.data as Profile);
+  if (!id || !userId) return;
 
-    const fetches: Promise<unknown>[] = [
-      supabase.from('profiles').select('*').eq('id', q.poster_id).single().then(({ data }) => { if (data) setPosterProfile(data as Profile); }),
-      supabase.from('messages').select('*').eq('quest_id', id).order('created_at').then(({ data }) => { if (data) setMessages(data as Message[]); }),
-      supabase.from('ratings').select('*').eq('quest_id', id).eq('rater_id', userId).maybeSingle().then(({ data }) => { if (data) setMyRating(data as Rating); }),
-      supabase.from('crew_members').select('*').eq('quest_id', id).eq('status', 'active').then(({ data }) => {
-        if (data) {
-          setCrewCount(data.length);
-          setIsCrewMember(data.some((m: any) => m.user_id === userId));
-        }
-      }),
-    ];
-    if (q.acceptor_id) fetches.push(fetchAcceptorProfile(q.acceptor_id));
-    await Promise.all(fetches);
-    setLoading(false);
-  }, [id, userId, fetchAcceptorProfile]);
+  // Use Promise.resolve to wrap Supabase calls
+  const [questRes, myProfileRes] = await Promise.all([
+    Promise.resolve(supabase.from('quests').select('*').eq('id', id).single()),
+    Promise.resolve(supabase.from('profiles').select('*').eq('id', userId).single()),
+  ]);
+
+  if (questRes.error || !questRes.data) { setLoading(false); return; }
+  const q = questRes.data as Quest;
+  setQuest(q);
+  if (myProfileRes.data) setMyProfile(myProfileRes.data as Profile);
+
+  // Wrap each operation in Promise.resolve and let TS infer the type
+  const fetches = [
+    Promise.resolve(
+      supabase.from('profiles').select('*').eq('id', q.poster_id).single()
+        .then(({ data }) => { if (data) setPosterProfile(data as Profile); })
+    ),
+    Promise.resolve(
+      supabase.from('messages').select('*').eq('quest_id', id).order('created_at')
+        .then(({ data }) => { if (data) setMessages(data as Message[]); })
+    ),
+    Promise.resolve(
+      supabase.from('ratings').select('*').eq('quest_id', id).eq('rater_id', userId).maybeSingle()
+        .then(({ data }) => { if (data) setMyRating(data as Rating); })
+    ),
+    Promise.resolve(
+      supabase.from('crew_members').select('*').eq('quest_id', id).eq('status', 'active')
+        .then(({ data }) => {
+          if (data) {
+            setCrewCount(data.length);
+            setIsCrewMember(data.some((m: any) => m.user_id === userId));
+          }
+        })
+    ),
+  ];
+
+  if (q.acceptor_id) {
+    fetches.push(Promise.resolve(fetchAcceptorProfile(q.acceptor_id)));
+  }
+
+  await Promise.all(fetches);
+  setLoading(false);
+}, [id, userId, fetchAcceptorProfile]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -270,19 +290,42 @@ export default function QuestDetail() {
   }, [id, fetchAcceptorProfile]);
 
   const handleAccept = async () => {
-    if (!quest || !userId || !myProfile) return;
-    setActionLoading(true);
-    const { error, count } = await supabase.from('quests').update({ status: 'in_progress', acceptor_id: userId }).eq('id', quest.id).eq('status', 'open').select('id', { count: 'exact', head: true });
-    if (error) { Alert.alert('Error', error.message); }
-    else if (count === 0) { Alert.alert('Could not accept', 'This quest may have already been taken.'); }
-    else {
-      setQuest(prev => prev ? { ...prev, status: 'in_progress', acceptor_id: userId } : prev);
-      setAcceptorProfile(myProfile);
-      acceptorFetched.current = true;
-      if (posterProfile?.push_token) await sendPushNotification(posterProfile.push_token, 'Quest Accepted!', `${myProfile.display_name} accepted: ${quest.title}`);
+  if (!quest || !userId || !myProfile) return;
+  setActionLoading(true);
+
+  // FIX: Change the select call to only take the columns string.
+  // We can determine if the update was successful by checking if 'data' exists and has length.
+  const { data, error } = await Promise.resolve(
+    supabase
+      .from('quests')
+      .update({ status: 'in_progress', acceptor_id: userId })
+      .eq('id', quest.id)
+      .eq('status', 'open')
+      .select('id') // Only 1 argument here
+  );
+
+  if (error) {
+    Alert.alert('Error', error.message);
+  } else if (!data || data.length === 0) {
+    // If data is empty, it means the .eq('status', 'open') failed 
+    // (someone else accepted it first)
+    Alert.alert('Could not accept', 'This quest may have already been taken.');
+  } else {
+    setQuest(prev => prev ? { ...prev, status: 'in_progress', acceptor_id: userId } : prev);
+    setAcceptorProfile(myProfile);
+    acceptorFetched.current = true;
+    
+    if (posterProfile?.push_token) {
+      // Ensure this function matches your definition (usually 2 or 3 arguments)
+      await sendPushNotification(
+        posterProfile.push_token, 
+        'Quest Accepted!', 
+        `${myProfile.display_name} accepted: ${quest.title}`
+      );
     }
-    setActionLoading(false);
-  };
+  }
+  setActionLoading(false);
+};
 
   const handleJoinCrew = async () => {
     if (!quest || !userId || !myProfile) return;
@@ -757,9 +800,7 @@ export default function QuestDetail() {
           </View>
 
           {/* Title */}
-          <Text style={{ color: colors.text, fontSize: 22, fontWeight: '700', letterSpacing: -0.6, lineHeight: 30, marginBottom: 10 }}>
-            {quest.ai_generated_title ?? quest.title}
-          </Text>
+          
           <Text style={{ color: colors.textMuted, fontSize: 15, lineHeight: 23, marginBottom: 20 }}>
             {quest.description}
           </Text>

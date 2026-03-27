@@ -102,7 +102,7 @@ export default function MapScreen() {
 
   // Current location
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<MapView>(null!);
 
   // Web side-panel animation
   const panelTranslateX = useSharedValue(PANEL_WIDTH);

@@ -40,6 +40,7 @@ import {
   type RankingContext,
 } from '@/lib/ranking';
 import type { Quest, QuestTag, FulfilmentMode } from '@/types/database';
+import { TrajectoryBanner } from '@/components/TrajectoryBanner';
 
 const MODE_OPTIONS: { value: FulfilmentMode | 'all'; label: string }[] = [
   { value: 'all',     label: 'Any' },
@@ -171,6 +172,24 @@ export default function Feed() {
     maxHeight: dropdownHeight.value,
     overflow: 'hidden',
   }));
+
+   useEffect(() => {
+    channelRef.current = supabase
+      .channel('quests-feed')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'quests' }, (payload) => {
+        const newQuest = payload.new as Quest;
+        if (newQuest.status === 'open') {
+          setQuests((prev) => {
+            // Only add if it doesn't already exist in state
+            const exists = prev.some(q => q.id === newQuest.id);
+            if (exists) return prev;
+            return [newQuest, ...prev];
+          });
+        }
+      })
+      .subscribe();
+    return () => { channelRef.current?.unsubscribe(); };
+  }, []);
 
   const toggleFilter = () => {
     const next = !filterOpen;
@@ -369,9 +388,20 @@ export default function Feed() {
   });
 
   // Semantic mode overrides the ranked list when results available
-  const activeQuestList = searchMode === 'semantic' && semanticResults !== null
-    ? semanticResults
-    : [...pinned, ...rankedWithContactBoost.map(r => r.quest)];
+  const activeQuestList = useMemo(() => {
+    let list: Quest[] = [];
+    if (searchMode === 'semantic' && semanticResults !== null) {
+      list = semanticResults;
+    } else {
+      // Combine pinned and ranked
+      list = [...pinned, ...rankedWithContactBoost.map(r => r.quest)];
+    }
+
+    // FINAL SAFETY DEDUPLICATION
+    return list.filter((item, index, self) => 
+      index === self.findIndex((t) => t.id === item.id)
+    );
+  }, [searchMode, semanticResults, pinned, rankedWithContactBoost]);
 
   const feedData = activeQuestList;
 
@@ -398,7 +428,11 @@ export default function Feed() {
 
   // Shared header rendered above both FlatLists
   const sharedHeader = (
-    <View>
+    <View style={{ paddingTop: insets.top }}>
+    {/* 1. TRAJECTORY BANNER - MUST BE AT THE VERY TOP */}
+    {userId && (
+      <TrajectoryBanner userId={userId} />
+    )}
       <ScreenHeader
         title="Quests"
         subtitle={
@@ -546,7 +580,7 @@ export default function Feed() {
     </View>
   );
 
-  return (
+   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {feedMode === 'quests' ? (
         <FlatList
