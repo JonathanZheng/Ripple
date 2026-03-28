@@ -784,7 +784,6 @@ export default function PostQuest() {
               <Card
                 key={m}
                 variant={mode === m ? 'elevated' : 'default'}
-                glow={mode === m}
                 onPress={() => setMode(m)}
                 style={{ flex: 1, alignItems: 'center', paddingVertical: 20 }}
               >

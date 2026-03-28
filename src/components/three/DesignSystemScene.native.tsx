@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
+import type { DimensionValue } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -19,8 +20,8 @@ function FloatingOrb({
   size: number;
   color: string;
   delay: number;
-  x: string;
-  y: string;
+  x: DimensionValue;
+  y: DimensionValue;
 }) {
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -30,8 +31,8 @@ function FloatingOrb({
       delay,
       withRepeat(
         withSequence(
-          withTiming(0.08, { duration: 2500 }),
-          withTiming(0.03, { duration: 2500 })
+          withTiming(0.40, { duration: 2500 }),
+          withTiming(0.18, { duration: 2500 })
         ),
         -1,
         true

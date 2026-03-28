@@ -25,7 +25,6 @@ export default {
     android: {
       adaptiveIcon: {
         foregroundImage: "./assets/android-icon-foreground.png",
-        backgroundImage: "./assets/android-icon-background.png",
         backgroundColor: "#0f0f14",
       },
       package: "com.ripple.app",

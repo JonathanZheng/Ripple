@@ -53,7 +53,7 @@ export function QuestAccordion({
   }));
 
   const buttonsStyle = useAnimatedStyle(() => ({
-    height: withTiming(isExpanded ? 48 : 0, ANIM),
+    height: withTiming(isExpanded ? 66 : 0, ANIM),
     opacity: withTiming(isExpanded ? 1 : 0, ANIM),
     overflow: 'hidden',
   }));

@@ -139,7 +139,7 @@ export default function Feed() {
   const [broadcastTagFilter, setBroadcastTagFilter] = useState<QuestTag | 'all'>('all');
   const [broadcastSearch, setBroadcastSearch] = useState('');
   const [broadcastFilterOpen, setBroadcastFilterOpen] = useState(false);
-  const [broadcastDropdownContentHeight, setBroadcastDropdownContentHeight] = useState(0);
+  const [broadcastDropdownContentHeight, setBroadcastDropdownContentHeight] = useState(150);
   const broadcastDropdownHeight = useSharedValue(0);
   const broadcastDropdownStyle = useAnimatedStyle(() => ({
     height: broadcastDropdownHeight.value,
@@ -167,7 +167,7 @@ export default function Feed() {
   const [seenCounts, setSeenCounts] = useState<Map<string, number>>(new Map());
   const [contactIds, setContactIds] = useState<Set<string>>(new Set());
 
-  const [dropdownContentHeight, setDropdownContentHeight] = useState(0);
+  const [dropdownContentHeight, setDropdownContentHeight] = useState(350);
   const dropdownHeight = useSharedValue(0);
   const dropdownStyle = useAnimatedStyle(() => ({
     height: dropdownHeight.value,

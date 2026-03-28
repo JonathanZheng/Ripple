@@ -40,17 +40,10 @@ export function Card({
 
   const containerStyle: ViewStyle = {
     backgroundColor: bg,
-    borderWidth: 1,
-    borderColor: border,
+    borderWidth: glow ? 1.5 : 1,
+    borderColor: glow ? 'rgba(124,58,237,0.7)' : border,
     borderRadius: 20,
     padding,
-    ...(glow && {
-      shadowColor: '#7c3aed',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.25,
-      shadowRadius: 16,
-      elevation: 8,
-    }),
   };
 
   if (onPress) {

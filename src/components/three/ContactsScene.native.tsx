@@ -226,8 +226,8 @@ export function ContactsScene({ contacts }: { contacts: ContactWithProfile[] }) 
         />
       ))}
 
-      {/* Nodes */}
-      <View style={{ position: 'absolute', width: 0, height: 0 }}>
+      {/* Nodes — 0×0 normal-flow View, centered by parent flex, so translateX/Y orbit offsets are correct */}
+      <View style={{ width: 0, height: 0 }}>
         {inner.map((c, i) => (
           <ContactNode
             key={c.contact_id}

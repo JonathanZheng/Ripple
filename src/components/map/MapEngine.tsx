@@ -61,6 +61,7 @@ export default function MapEngine({
           onPress={() => onLocationPress(marker)}
         >
           <View
+            collapsable={false}
             style={{
               backgroundColor: 'rgba(124,58,237,0.65)',
               width: 36,
