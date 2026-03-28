@@ -36,8 +36,9 @@ import { Input } from '@/components/ui/Input';
 import { Chip } from '@/components/ui/Chip';
 import { Badge } from '@/components/ui/Badge';
 import { StepIndicator } from '@/components/ui/StepIndicator';
-import { Users, Package, Send, Zap, MapPin, X, Search } from 'lucide-react-native';
+import { Users, Package, Send, Zap, MapPin, X, Search, Calendar } from 'lucide-react-native';
 import type { QuestTag, FulfilmentMode } from '@/types/database';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 // ─── Price Suggestion ─────────────────────────────────────────────────────────
 
@@ -59,14 +60,14 @@ const UTOWN_LNG = 103.7733;
 const STEPS = ['Details', 'Location', 'Reward'] as const;
 type Step = (typeof STEPS)[number];
 
-const DEADLINE_LABELS = ['1 hour', '3 hours', 'Tonight (10 PM)', 'Tomorrow noon'] as const;
+const DEADLINE_LABELS = ['1 hour', '3 hours', 'Tonight (10 PM)', 'Tomorrow noon', 'Custom…'] as const;
 type DeadlineLabel = (typeof DEADLINE_LABELS)[number];
 
 
-function buildDeadlineFromLabel(label: DeadlineLabel): Date {
+function buildDeadlineFromLabel(label: Exclude<DeadlineLabel, 'Custom…'>): Date {
   switch (label) {
-    case '1 hour':      return new Date(Date.now() + 1 * 3600 * 1000);
-    case '3 hours':     return new Date(Date.now() + 3 * 3600 * 1000);
+    case '1 hour':          return new Date(Date.now() + 1 * 3600 * 1000);
+    case '3 hours':         return new Date(Date.now() + 3 * 3600 * 1000);
     case 'Tonight (10 PM)': return todayAt(22);
     case 'Tomorrow noon':   return tomorrowAt(12);
   }
@@ -226,7 +227,7 @@ export default function PostQuest() {
     if (!shouldReset.current) return;
     shouldReset.current = false;
     setTitle(''); setDescription(''); setTag(''); setMode('meetup');
-    setReward(''); setDeadlineLabel(''); setLocationName('');
+    setReward(''); setDeadlineLabel(''); setCustomDeadline(null); setShowDatePicker(false); setShowTimePicker(false); setLocationName('');
     setPreciseLocation(''); setLocationSearch('');
     setPickedLat(null); setPickedLon(null);
     setIsFlash(false); setQuestType('standard'); setMaxAcceptors(2);
@@ -244,6 +245,9 @@ export default function PostQuest() {
   const [mode, setMode] = useState<FulfilmentMode>('meetup');
   const [reward, setReward] = useState('');
   const [deadlineLabel, setDeadlineLabel] = useState<DeadlineLabel | ''>('');
+  const [customDeadline, setCustomDeadline] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [locationName, setLocationName] = useState('');
   const [preciseLocation, setPreciseLocation] = useState('');
   const [locationSearch, setLocationSearch] = useState('');
@@ -355,7 +359,7 @@ export default function PostQuest() {
       tag: (f.tag as QuestTag) || 'errands',
       fulfilment_mode: f.fulfilment_mode ?? 'meetup',
       reward_amount: f.reward_amount ?? 0,
-      deadline_label: f.deadline_label as DeadlineLabel,
+      deadline_label: f.deadline_label as Exclude<DeadlineLabel, 'Custom…'>,
       location_name: f.location_name ?? 'UTown, NUS',
     });
   }
@@ -369,7 +373,8 @@ export default function PostQuest() {
     if (!title.trim()) { setError('Quest title is required.'); return; }
     if (!description.trim() || description.length < 10) { setError('Description must be at least 10 characters.'); return; }
     if (!deadlineLabel) { setError('Please select a deadline.'); return; }
-    const deadlineDate = buildDeadlineFromLabel(deadlineLabel as DeadlineLabel);
+    if (deadlineLabel === 'Custom…' && !customDeadline) { setError('Please pick a custom date and time.'); return; }
+    const deadlineDate = deadlineLabel === 'Custom…' ? customDeadline! : buildDeadlineFromLabel(deadlineLabel as Exclude<DeadlineLabel, 'Custom…'>);
     if (deadlineDate <= new Date()) { setError('Deadline must be in the future.'); return; }
     setLoading(true); setError('');
     try {
@@ -408,7 +413,7 @@ export default function PostQuest() {
   async function submitQuest(fields: {
     title: string; description: string; tag: QuestTag;
     fulfilment_mode: 'meetup' | 'dropoff'; reward_amount: number;
-    deadline_label: DeadlineLabel; location_name: string;
+    deadline_label: Exclude<DeadlineLabel, 'Custom…'>; location_name: string;
   }) {
     if (!fields.title.trim()) { setError('Quest title is required.'); return; }
     if (!fields.description.trim() || fields.description.length < 10) { setError('Description must be at least 10 characters.'); return; }
@@ -462,7 +467,8 @@ export default function PostQuest() {
     }
     if (step === 'Reward') {
       if (!deadlineLabel) { setError('Please select a deadline.'); return; }
-      const d = buildDeadlineFromLabel(deadlineLabel as DeadlineLabel);
+      if (deadlineLabel === 'Custom…' && !customDeadline) { setError('Please pick a custom date and time.'); return; }
+      const d = deadlineLabel === 'Custom…' ? customDeadline! : buildDeadlineFromLabel(deadlineLabel as Exclude<DeadlineLabel, 'Custom…'>);
       if (d <= new Date()) { setError('Deadline must be in the future.'); return; }
     }
     const nextIndex = stepIndex + 1;
@@ -843,7 +849,7 @@ export default function PostQuest() {
           <StepIndicator steps={[...STEPS]} currentIndex={stepIndex} />
 
           <Text style={{ color: '#ffffff', fontSize: 22, fontWeight: '700', letterSpacing: -0.5, marginTop: 20, marginBottom: 4 }}>
-            Where?
+            Where to meet/drop off at?
           </Text>
           <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, marginBottom: 24 }}>
             Search for a location, then add a precise spot.
@@ -1004,16 +1010,95 @@ export default function PostQuest() {
         <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '600', letterSpacing: 0.8, marginBottom: 12 }}>
           DEADLINE
         </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: deadlineLabel === 'Custom…' ? 12 : 24 }}>
           {DEADLINE_LABELS.map((label) => (
             <Chip
               key={label}
               label={label}
               selected={deadlineLabel === label}
-              onPress={() => setDeadlineLabel(label)}
+              onPress={() => { setDeadlineLabel(label); if (label !== 'Custom…') setCustomDeadline(null); }}
             />
           ))}
         </View>
+
+        {deadlineLabel === 'Custom…' && (
+          <View style={{ marginBottom: 24 }}>
+            {Platform.OS === 'web' ? (
+              /* Web: datetime-local input styled to look like the calendar button */
+              <View style={{
+                flexDirection: 'row', alignItems: 'center', gap: 10,
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                borderWidth: 1, borderColor: customDeadline ? 'rgba(124,58,237,0.50)' : 'rgba(255,255,255,0.10)',
+                borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+              }}>
+                <Calendar size={16} color={customDeadline ? '#a78bfa' : 'rgba(255,255,255,0.35)'} />
+                {/* @ts-ignore — web-only HTML input */}
+                <input
+                  type="datetime-local"
+                  min={new Date().toISOString().slice(0, 16)}
+                  value={customDeadline ? new Date(customDeadline.getTime() - customDeadline.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                  onChange={(e: any) => setCustomDeadline(e.target.value ? new Date(e.target.value) : null)}
+                  style={{
+                    flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                    color: customDeadline ? '#a78bfa' : 'rgba(255,255,255,0.35)',
+                    fontSize: 14, colorScheme: 'dark', cursor: 'pointer',
+                  }}
+                />
+              </View>
+            ) : (
+              /* Native: single calendar button — tapping opens date picker, then auto-opens time picker */
+              <TouchableOpacity
+                onPress={() => setShowDatePicker(true)}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 10,
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  borderWidth: 1, borderColor: customDeadline ? 'rgba(124,58,237,0.50)' : 'rgba(255,255,255,0.10)',
+                  borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
+                }}
+              >
+                <Calendar size={16} color={customDeadline ? '#a78bfa' : 'rgba(255,255,255,0.35)'} />
+                <Text style={{ color: customDeadline ? '#a78bfa' : 'rgba(255,255,255,0.35)', fontSize: 14, flex: 1 }}>
+                  {customDeadline
+                    ? `${customDeadline.toLocaleDateString()} ${customDeadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                    : 'Pick date & time'}
+                </Text>
+              </TouchableOpacity>
+            )}
+            {/* Native date picker — after picking date, auto-opens time picker */}
+            {showDatePicker && (
+              <DateTimePicker
+                mode="date"
+                value={customDeadline ?? new Date()}
+                minimumDate={new Date()}
+                onChange={(_, d) => {
+                  setShowDatePicker(false);
+                  if (d) {
+                    setCustomDeadline(prev => {
+                      const t = new Date(prev ?? new Date());
+                      t.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
+                      return t;
+                    });
+                    setShowTimePicker(true);  // auto-open time picker after date is picked
+                  }
+                }}
+              />
+            )}
+            {showTimePicker && (
+              <DateTimePicker
+                mode="time"
+                value={customDeadline ?? new Date()}
+                onChange={(_, d) => {
+                  setShowTimePicker(false);
+                  if (d) setCustomDeadline(prev => {
+                    const t = new Date(prev ?? new Date());
+                    t.setHours(d.getHours(), d.getMinutes());
+                    return t;
+                  });
+                }}
+              />
+            )}
+          </View>
+        )}
 
         {/* Flash Quest toggle */}
         <Card style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>

@@ -1,0 +1,85 @@
+export default {
+  expo: {
+    name: "Ripple",
+    slug: "ripple",
+    version: "1.0.0",
+    scheme: "ripple",
+    orientation: "portrait",
+    icon: "./assets/icon.png",
+    userInterfaceStyle: "dark",
+    splash: {
+      image: "./assets/splash-icon.png",
+      resizeMode: "contain",
+      backgroundColor: "#0f0f14",
+    },
+    ios: {
+      supportsTablet: false,
+      bundleIdentifier: "com.ripple.app",
+      infoPlist: {
+        NSLocationWhenInUseUsageDescription:
+          "Ripple uses your location to show nearby quests and distances to quest locations.",
+        NSLocationAlwaysAndWhenInUseUsageDescription:
+          "Ripple uses your location to match you with quests and route offers near you.",
+      },
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/android-icon-foreground.png",
+        backgroundImage: "./assets/android-icon-background.png",
+        backgroundColor: "#0f0f14",
+      },
+      package: "com.ripple.app",
+      predictiveBackGestureEnabled: false,
+      permissions: [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+      ],
+      config: {
+        googleMaps: {
+          apiKey: process.env.GOOGLE_MAPS_API_KEY,
+        },
+      },
+    },
+    web: {
+      bundler: "metro",
+      favicon: "./assets/favicon.png",
+    },
+    plugins: [
+      "expo-router",
+      "expo-location",
+      [
+        "expo-camera",
+        {
+          cameraPermission:
+            "Ripple needs camera access to verify your student pass and submit drop-off photos.",
+        },
+      ],
+      [
+        "expo-image-picker",
+        {
+          photosPermission:
+            "Ripple needs photo access to submit drop-off proof photos.",
+        },
+      ],
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/notification-icon.png",
+        },
+      ],
+      "@react-native-community/datetimepicker",
+    ],
+    experiments: {
+      typedRoutes: true,
+      baseUrl: "/Ripple",
+    },
+    extra: {
+      router: {},
+      eas: {
+        projectId: "54c7b954-ed35-40fb-8824-0b7b867ce7a8",
+      },
+    },
+  },
+};

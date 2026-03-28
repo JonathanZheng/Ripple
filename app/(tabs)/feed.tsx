@@ -100,7 +100,6 @@ function deadlineInRange(deadline: string, filter: DeadlineFilter): boolean {
   }
 }
 
-const DROPDOWN_HEIGHT = 280;
 const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 50 };
 
 function getDist(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -140,15 +139,16 @@ export default function Feed() {
   const [broadcastTagFilter, setBroadcastTagFilter] = useState<QuestTag | 'all'>('all');
   const [broadcastSearch, setBroadcastSearch] = useState('');
   const [broadcastFilterOpen, setBroadcastFilterOpen] = useState(false);
+  const [broadcastDropdownContentHeight, setBroadcastDropdownContentHeight] = useState(0);
   const broadcastDropdownHeight = useSharedValue(0);
   const broadcastDropdownStyle = useAnimatedStyle(() => ({
-    maxHeight: broadcastDropdownHeight.value,
+    height: broadcastDropdownHeight.value,
     overflow: 'hidden',
   }));
   const toggleBroadcastFilter = () => {
     const next = !broadcastFilterOpen;
     setBroadcastFilterOpen(next);
-    broadcastDropdownHeight.value = withTiming(next ? 120 : 0, { duration: 250 });
+    broadcastDropdownHeight.value = withTiming(next ? broadcastDropdownContentHeight : 0, { duration: 250 });
   };
   const feedPill = useSharedValue(0);
   const [feedTabWidth, setFeedTabWidth] = useState(0);
@@ -167,9 +167,10 @@ export default function Feed() {
   const [seenCounts, setSeenCounts] = useState<Map<string, number>>(new Map());
   const [contactIds, setContactIds] = useState<Set<string>>(new Set());
 
+  const [dropdownContentHeight, setDropdownContentHeight] = useState(0);
   const dropdownHeight = useSharedValue(0);
   const dropdownStyle = useAnimatedStyle(() => ({
-    maxHeight: dropdownHeight.value,
+    height: dropdownHeight.value,
     overflow: 'hidden',
   }));
 
@@ -194,7 +195,7 @@ export default function Feed() {
   const toggleFilter = () => {
     const next = !filterOpen;
     setFilterOpen(next);
-    dropdownHeight.value = withTiming(next ? DROPDOWN_HEIGHT : 0, { duration: 250 });
+    dropdownHeight.value = withTiming(next ? dropdownContentHeight : 0, { duration: 250 });
   };
 
   const resetFilters = () => {
@@ -302,7 +303,7 @@ export default function Feed() {
     const { data } = await supabase
       .from('route_offers')
       .select('*, profiles(id, display_name, rc, trust_tier, avg_rating, avatar_url)')
-      .eq('is_active', true)
+      .eq('status', 'waiting')
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false });
     if (data) setRouteOffers(data as RouteOfferWithProfile[]);
@@ -426,13 +427,9 @@ export default function Feed() {
     });
   }, []);
 
-  // Shared header rendered above both FlatLists
+  // Shared header rendered above both FlatLists (banners are NOT here — they live outside)
   const sharedHeader = (
-    <View style={{ paddingTop: insets.top }}>
-    {/* 1. TRAJECTORY BANNER - MUST BE AT THE VERY TOP */}
-    {userId && (
-      <TrajectoryBanner userId={userId} />
-    )}
+    <View>
       <ScreenHeader
         title="Quests"
         subtitle={
@@ -498,11 +495,6 @@ export default function Feed() {
         ))}
       </View>
 
-      {/* Route offer banner (quests mode only) */}
-      {feedMode === 'quests' && activeOffer && (
-        <RouteOfferBanner offer={activeOffer} onCancel={cancelOffer} />
-      )}
-
       {/* Broadcast filters */}
       {feedMode === 'broadcast' && (
         <View style={{ paddingHorizontal: 4, marginBottom: 10 }}>
@@ -545,7 +537,12 @@ export default function Feed() {
           </View>
 
           <Animated.View style={[broadcastDropdownStyle, { paddingHorizontal: 0, marginBottom: broadcastFilterOpen ? 10 : 0 }]}>
-            <View style={{
+            <View
+              onLayout={(e) => {
+                const h = e.nativeEvent.layout.height;
+                if (h > 0) setBroadcastDropdownContentHeight(h);
+              }}
+              style={{
               backgroundColor: 'rgba(255,255,255,0.04)',
               borderWidth: 1,
               borderColor: 'rgba(255,255,255,0.08)',
@@ -582,6 +579,12 @@ export default function Feed() {
 
    return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* ── Persistent banners — rendered outside FlatLists so they never unmount on tab switch ── */}
+      <View style={{ paddingTop: insets.top }}>
+        {userId && <TrajectoryBanner userId={userId} />}
+        {activeOffer && <RouteOfferBanner offer={activeOffer} onCancel={cancelOffer} />}
+      </View>
+
       {feedMode === 'quests' ? (
         <FlatList
           key="quests-list"
@@ -686,7 +689,12 @@ export default function Feed() {
 
             {/* Animated filter dropdown */}
             <Animated.View style={[dropdownStyle, { paddingHorizontal: 4, marginBottom: filterOpen ? 10 : 0 }]}>
-              <View style={{
+              <View
+                onLayout={(e) => {
+                  const h = e.nativeEvent.layout.height;
+                  if (h > 0) setDropdownContentHeight(h);
+                }}
+                style={{
                 backgroundColor: 'rgba(255,255,255,0.04)',
                 borderWidth: 1,
                 borderColor: 'rgba(255,255,255,0.08)',
@@ -811,7 +819,6 @@ export default function Feed() {
         <FlatList
           key="broadcast-list"
           data={routeOffers.filter((o) => {
-            if (o.profiles?.id === session?.user?.id) return false;
             if (broadcastTagFilter !== 'all') {
               if (!o.tags || o.tags.length === 0) return true; // "can help with anything"
               if (!o.tags.includes(broadcastTagFilter)) return false;

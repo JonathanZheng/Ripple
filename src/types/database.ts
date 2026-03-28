@@ -14,6 +14,9 @@ export interface RouteOffer {
   note: string | null;
   expires_at: string;
   is_active: boolean;
+  transport_type: 'walking' | 'bus' | 'location';
+  status: string;
+  departure_delay_seconds: number;
   created_at: string;
 }
 

@@ -1,21 +1,15 @@
 import {
   View,
   Text,
-  Platform,
   TextInput,
   FlatList,
   TouchableOpacity,
 } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { Search, X, SlidersHorizontal, Navigation2, Compass } from 'lucide-react-native';
+import { Search, SlidersHorizontal, Navigation2, Compass } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
@@ -28,8 +22,6 @@ import type { LocationMarker, FocusPin } from '@/components/map/MapEngine';
 import type { Quest, Profile, QuestTag } from '@/types/database';
 import * as Location from 'expo-location';
 import MapView from 'react-native-maps';
-
-const PANEL_WIDTH = 440;
 
 function getDist(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371;
@@ -104,13 +96,6 @@ export default function MapScreen() {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const mapRef = useRef<MapView>(null!);
 
-  // Web side-panel animation
-  const panelTranslateX = useSharedValue(PANEL_WIDTH);
-  const SLIDE = { duration: 220, easing: Easing.out(Easing.cubic) };
-  const panelStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: panelTranslateX.value }],
-  }));
-
   // Auto-request location on mount
   useEffect(() => {
     (async () => {
@@ -177,26 +162,14 @@ export default function MapScreen() {
     } else {
       setClusterDistance(undefined);
     }
-    if (Platform.OS === 'web') {
-      panelTranslateX.value = withTiming(0, SLIDE);
-    }
   }
 
   function closePanel() {
-    if (Platform.OS === 'web') {
-      panelTranslateX.value = withTiming(PANEL_WIDTH, SLIDE);
-      setTimeout(() => {
-        setSelectedQuests([]);
-        setIsPanelOpen(false);
-        setExpandedQuestId(null);
-      }, 300);
-    } else {
-      setIsPanelOpen(false);
-      setTimeout(() => {
-        setSelectedQuests([]);
-        setExpandedQuestId(null);
-      }, 350);
-    }
+    setIsPanelOpen(false);
+    setTimeout(() => {
+      setSelectedQuests([]);
+      setExpandedQuestId(null);
+    }, 400);
   }
 
   function handleQuestToggle(questId: string) {
@@ -246,7 +219,7 @@ export default function MapScreen() {
           position: 'absolute',
           top: insets.top + 20,
           left: 16,
-          right: Platform.OS === 'web' && isPanelOpen ? PANEL_WIDTH + 16 : 16,
+          right: 16,
           zIndex: 100,
         }}
       >
@@ -340,93 +313,19 @@ export default function MapScreen() {
         )}
       </View>
 
-      {/* Web: side panel */}
-      {Platform.OS === 'web' && (
-        <Animated.View
-          style={[
-            {
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              bottom: 0,
-              width: PANEL_WIDTH,
-              backgroundColor: 'rgba(10,10,14,0.55)',
-              borderLeftWidth: 1,
-              borderLeftColor: 'rgba(255,255,255,0.10)',
-              zIndex: 500,
-              paddingTop: insets.top + 16,
-              // @ts-ignore
-              backdropFilter: 'blur(28px) saturate(160%)', WebkitBackdropFilter: 'blur(28px) saturate(160%)',
-            },
-            panelStyle,
-          ]}
-        >
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingHorizontal: 20,
-              paddingBottom: 16,
-              borderBottomWidth: 1,
-              borderBottomColor: 'rgba(255,255,255,0.06)',
-            }}
-          >
-            <View>
-              <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: -0.4 }}>
-                {selectedLocationName || 'Quest Details'}
-              </Text>
-              <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 3 }}>
-                {selectedQuests.length === 0
-                  ? 'No quests at this location'
-                  : `${selectedQuests.length} quest${selectedQuests.length > 1 ? 's' : ''} here`}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={closePanel} hitSlop={8}>
-              <X size={24} color="rgba(255,255,255,0.6)" />
-            </TouchableOpacity>
-          </View>
-
-          <FlatList
-            data={selectedQuests}
-            keyExtractor={(q) => q.id}
-            contentContainerStyle={{ padding: 16, gap: 12 }}
-            ListEmptyComponent={
-              <View style={{ alignItems: 'center', paddingTop: 40 }}>
-                <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 14 }}>
-                  No open quests here yet
-                </Text>
-              </View>
-            }
-            renderItem={({ item }) => (
-              <QuestAccordion
-                quest={item}
-                userTier={userTier}
-                isExpanded={expandedQuestId === item.id}
-                onToggle={() => handleQuestToggle(item.id)}
-                posterProfile={posterProfiles[item.poster_id] ?? null}
-                isLoadingPoster={loadingPosters.has(item.poster_id)}
-                distance={clusterDistance}
-              />
-            )}
-          />
-        </Animated.View>
-      )}
-
-      {/* Mobile: bottom sheet */}
-      {Platform.OS !== 'web' && (
-        <MobileBottomSheet
-          visible={isPanelOpen}
-          quests={selectedQuests}
-          expandedQuestId={expandedQuestId}
-          onQuestToggle={handleQuestToggle}
-          posterProfiles={posterProfiles}
-          loadingPosters={loadingPosters}
-          onClose={closePanel}
-          userTier={userTier}
-          clusterDistance={clusterDistance}
-        />
-      )}
+      {/* Bottom sheet — used on all platforms */}
+      <MobileBottomSheet
+        visible={isPanelOpen}
+        locationName={selectedLocationName}
+        quests={selectedQuests}
+        expandedQuestId={expandedQuestId}
+        onQuestToggle={handleQuestToggle}
+        posterProfiles={posterProfiles}
+        loadingPosters={loadingPosters}
+        onClose={closePanel}
+        userTier={userTier}
+        clusterDistance={clusterDistance}
+      />
 
       {/* "Going out?" FAB */}
       <TouchableOpacity

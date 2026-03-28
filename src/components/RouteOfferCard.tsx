@@ -31,18 +31,27 @@ export function RouteOfferCard({ offer, currentUserId }: Props) {
   const tierConfig = TRUST_TIER_CONFIG[profile.trust_tier as keyof typeof TRUST_TIER_CONFIG];
   const expiresAt = new Date(offer.expires_at);
   const timeLeft = formatDistanceToNow(expiresAt, { addSuffix: false });
-
-  // Don't render own card
-  if (profile.id === currentUserId) return null;
+  const isOwn = profile.id === currentUserId;
+  const isLocationBroadcast = offer.transport_type === 'location';
 
   return (
     <Card
       style={{
         marginBottom: 10,
         borderWidth: 1,
-        borderColor: 'rgba(59,130,246,0.20)',
+        borderColor: isOwn ? 'rgba(16,185,129,0.40)' : 'rgba(59,130,246,0.20)',
+        backgroundColor: isOwn ? 'rgba(16,185,129,0.05)' : undefined,
       }}
     >
+      {/* Own broadcast badge */}
+      {isOwn && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+          <View style={{ backgroundColor: 'rgba(16,185,129,0.18)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.40)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+            <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '700' }}>YOUR BROADCAST</Text>
+          </View>
+        </View>
+      )}
+
       {/* Profile row */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
         <Avatar name={profile.display_name} size="sm" tierColor={tierConfig?.colour} />
@@ -65,11 +74,11 @@ export function RouteOfferCard({ offer, currentUserId }: Props) {
         <Badge variant="tier" value={profile.trust_tier as any} color={tierConfig?.colour} />
       </View>
 
-      {/* Destination row */}
+      {/* Destination / location row */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <Navigation2 size={14} color="#3b82f6" strokeWidth={2.5} />
-        <Text style={{ color: '#3b82f6', fontWeight: '700', fontSize: 14 }}>
-          Heading to {offer.destination_name}
+        <Navigation2 size={14} color={isLocationBroadcast ? '#10b981' : '#3b82f6'} strokeWidth={2.5} />
+        <Text style={{ color: isLocationBroadcast ? '#10b981' : '#3b82f6', fontWeight: '700', fontSize: 14 }}>
+          {isLocationBroadcast ? `Available at ${offer.destination_name}` : `Heading to ${offer.destination_name}`}
         </Text>
       </View>
 
@@ -111,18 +120,33 @@ export function RouteOfferCard({ offer, currentUserId }: Props) {
         <Text style={{ color: colors.textFaint, fontSize: 12 }}>
           Active for {timeLeft}
         </Text>
-        <TouchableOpacity
-          onPress={() => router.push(`/dm/${profile.id}`)}
-          style={{
-            flexDirection: 'row', alignItems: 'center', gap: 6,
-            backgroundColor: '#3b82f6', borderRadius: 10,
-            paddingHorizontal: 14, paddingVertical: 8,
-          }}
-          activeOpacity={0.8}
-        >
-          <MessageCircle size={14} color="#fff" strokeWidth={2.5} />
-          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Chat</Text>
-        </TouchableOpacity>
+        {isOwn ? (
+          <TouchableOpacity
+            onPress={() => router.push('/route-offer-confirm')}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 6,
+              backgroundColor: 'rgba(16,185,129,0.18)', borderRadius: 10,
+              paddingHorizontal: 14, paddingVertical: 8,
+              borderWidth: 1, borderColor: 'rgba(16,185,129,0.40)',
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={{ color: '#10b981', fontWeight: '700', fontSize: 13 }}>View</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={() => router.push(`/dm/${profile.id}`)}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 6,
+              backgroundColor: '#3b82f6', borderRadius: 10,
+              paddingHorizontal: 14, paddingVertical: 8,
+            }}
+            activeOpacity={0.8}
+          >
+            <MessageCircle size={14} color="#fff" strokeWidth={2.5} />
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Chat</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </Card>
   );

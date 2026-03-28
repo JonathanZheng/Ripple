@@ -22,12 +22,13 @@ import { useRouteOffer } from '@/hooks/useRouteOffer';
 import { useContacts } from '@/hooks/useContacts';
 import type { Profile, Quest } from '@/types/database';
 
-type Tab = 'posted' | 'inprogress' | 'completed';
+type Tab = 'posted' | 'inprogress' | 'completed' | 'expired';
 
 const TABS: { value: Tab; label: string }[] = [
   { value: 'posted',     label: 'Posted'      },
   { value: 'inprogress', label: 'In Progress' },
   { value: 'completed',  label: 'Completed'   },
+  { value: 'expired',    label: 'Expired'     },
 ];
 
 export default function ProfileScreen() {
@@ -114,9 +115,15 @@ export default function ProfileScreen() {
   }
 
   const tierConfig = TRUST_TIER_CONFIG[profile.trust_tier];
+
+  // Derive active-posted and expired from postedQuests using effectiveStatus
+  const activePostedQuests = postedQuests.filter(q => effectiveStatus(q) === 'open');
+  const expiredQuests = postedQuests.filter(q => effectiveStatus(q) === 'expired');
+
   const tabQuests: Quest[] =
-    activeTab === 'posted' ? postedQuests :
+    activeTab === 'posted'     ? activePostedQuests :
     activeTab === 'inprogress' ? inProgressQuests :
+    activeTab === 'expired'    ? expiredQuests :
     completedQuests;
 
   function effectiveStatus(quest: Quest): string {

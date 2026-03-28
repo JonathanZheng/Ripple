@@ -366,6 +366,30 @@ export default function QuestDetail() {
     }, 'Cancel Quest');
   };
 
+  const handleCancelInProgress = () => {
+    if (!quest || !userId) return;
+    webConfirm(
+      'Cancel Quest',
+      'Cancelling while a helper is in progress will expire the quest and apply a small trust penalty to you. Continue?',
+      async () => {
+        setActionLoading(true);
+        await supabase.from('quests').update({ status: 'expired' }).eq('id', quest.id);
+        // Small trust penalty for poster cancelling mid-fulfillment
+        const { data: profile } = await supabase.from('profiles').select('trust_score').eq('id', userId).single();
+        if (profile) {
+          await supabase.from('profiles').update({ trust_score: Math.max(0, (profile.trust_score ?? 100) - 5) }).eq('id', userId);
+        }
+        if (acceptorProfile?.push_token) {
+          await sendPushNotification(acceptorProfile.push_token, 'Quest Cancelled', 'The poster cancelled this quest.');
+        }
+        setActionLoading(false);
+        const dest: Record<string, string> = { feed: '/(tabs)/feed', profile: '/(tabs)/profile' };
+        router.navigate((dest[from ?? ''] ?? '/(tabs)/feed') as any);
+      },
+      'Cancel Quest'
+    );
+  };
+
   const handleDropOut = () => {
     if (!quest || !userId) return;
     const graceEnd = addMinutes(new Date(quest.created_at), GRACE_WINDOW_MINUTES);
@@ -375,6 +399,9 @@ export default function QuestDetail() {
       if (pastGrace) await supabase.from('strikes').insert({ user_id: userId, quest_id: quest.id, reason: 'abandonment' });
       acceptorFetched.current = false;
       await supabase.from('quests').update({ status: 'open', acceptor_id: null }).eq('id', quest.id);
+      if (posterProfile?.push_token) {
+        await sendPushNotification(posterProfile.push_token, 'Helper Dropped Out', 'Your quest is back on the feed.');
+      }
       setActionLoading(false);
       const dest: Record<string, string> = { feed: '/(tabs)/feed', profile: '/(tabs)/profile' };
       router.navigate((dest[from ?? ''] ?? '/(tabs)/feed') as any);
@@ -632,15 +659,26 @@ export default function QuestDetail() {
       }
       if (isPoster) {
         if (quest.fulfilment_mode === 'meetup') {
-          return <Button variant="primary" size="lg" loading={actionLoading} onPress={handleMarkComplete} style={{ width: '100%' }}>Mark Complete</Button>;
+          return (
+            <View style={{ gap: 10 }}>
+              <Button variant="primary" size="lg" loading={actionLoading} onPress={handleMarkComplete} style={{ width: '100%' }}>Mark Complete</Button>
+              <Button variant="danger" size="sm" loading={actionLoading} onPress={handleCancelInProgress} style={{ width: '100%' }}>Cancel Quest</Button>
+            </View>
+          );
         }
         if (!quest.drop_off_photo_url) {
-          return <Card style={{ alignItems: 'center' }}><Text style={{ color: colors.textMuted, fontSize: 14 }}>Waiting for drop-off photo...</Text></Card>;
+          return (
+            <View style={{ gap: 10 }}>
+              <Card style={{ alignItems: 'center' }}><Text style={{ color: colors.textMuted, fontSize: 14 }}>Waiting for drop-off photo...</Text></Card>
+              <Button variant="danger" size="sm" loading={actionLoading} onPress={handleCancelInProgress} style={{ width: '100%' }}>Cancel Quest</Button>
+            </View>
+          );
         }
         return (
           <View style={{ gap: 10 }}>
             <Image source={{ uri: quest.drop_off_photo_url }} style={{ width: '100%', height: 200, borderRadius: 16 }} resizeMode="cover" />
             <Button variant="primary" size="lg" loading={actionLoading} onPress={handleConfirmReceipt} style={{ width: '100%' }}>Confirm Receipt</Button>
+            <Button variant="danger" size="sm" loading={actionLoading} onPress={handleCancelInProgress} style={{ width: '100%' }}>Cancel Quest</Button>
           </View>
         );
       }
