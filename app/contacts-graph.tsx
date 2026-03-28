@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/hooks/useSession';
@@ -8,8 +8,6 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { TRUST_TIER_CONFIG } from '@/constants';
-// Expo auto-resolves ContactsScene.web.tsx on web, ContactsScene.native.tsx on native
-import { ContactsScene } from '@/components/three/ContactsScene';
 
 export default function ContactsGraph() {
   const insets = useSafeAreaInsets();
@@ -18,8 +16,6 @@ export default function ContactsGraph() {
   const { contacts, loading } = useContacts(userId);
   const { colors } = useTheme();
 
-  const sceneContacts = contacts.slice(0, 12);
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScreenHeader
@@ -27,21 +23,6 @@ export default function ContactsGraph() {
         backAction
         onBack={() => router.navigate('/(tabs)/profile' as any)}
       />
-
-      {/* 3D / 2D Scene */}
-      <View style={{ height: 300, position: 'relative' }}>
-        {loading ? (
-          <ActivityIndicator style={{ flex: 1 }} color="rgba(255,255,255,0.30)" />
-        ) : contacts.length === 0 ? (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 14 }}>
-              No contacts yet. Complete quests to add contacts.
-            </Text>
-          </View>
-        ) : (
-          <ContactsScene contacts={sceneContacts} />
-        )}
-      </View>
 
       {/* All contacts list */}
       <ScrollView

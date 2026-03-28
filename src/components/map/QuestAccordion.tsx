@@ -53,7 +53,7 @@ export function QuestAccordion({
   }));
 
   const buttonsStyle = useAnimatedStyle(() => ({
-    height: withTiming(isExpanded ? 66 : 0, ANIM),
+    height: withTiming(isExpanded ? 72 : 0, ANIM),
     opacity: withTiming(isExpanded ? 1 : 0, ANIM),
     overflow: 'hidden',
   }));
@@ -165,10 +165,10 @@ export function QuestAccordion({
             flexDirection: 'row',
             gap: 8,
             paddingHorizontal: 14,
-            paddingBottom: 12,
+            paddingBottom: 14,
             borderTopWidth: 1,
             borderTopColor: 'rgba(255,255,255,0.06)',
-            paddingTop: 10,
+            paddingTop: 14,
           }}
         >
           <TouchableOpacity

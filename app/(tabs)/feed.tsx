@@ -6,7 +6,14 @@ import {
   RefreshControl,
   Pressable,
   LayoutChangeEvent,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
+
+if (Platform.OS === 'android') {
+  UIManager.setLayoutAnimationEnabledExperimental?.(true);
+}
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Location from 'expo-location';
 import { useFocusEffect } from 'expo-router';
@@ -139,16 +146,9 @@ export default function Feed() {
   const [broadcastTagFilter, setBroadcastTagFilter] = useState<QuestTag | 'all'>('all');
   const [broadcastSearch, setBroadcastSearch] = useState('');
   const [broadcastFilterOpen, setBroadcastFilterOpen] = useState(false);
-  const [broadcastDropdownContentHeight, setBroadcastDropdownContentHeight] = useState(150);
-  const broadcastDropdownHeight = useSharedValue(0);
-  const broadcastDropdownStyle = useAnimatedStyle(() => ({
-    height: broadcastDropdownHeight.value,
-    overflow: 'hidden',
-  }));
   const toggleBroadcastFilter = () => {
-    const next = !broadcastFilterOpen;
-    setBroadcastFilterOpen(next);
-    broadcastDropdownHeight.value = withTiming(next ? broadcastDropdownContentHeight : 0, { duration: 250 });
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setBroadcastFilterOpen((v) => !v);
   };
   const feedPill = useSharedValue(0);
   const [feedTabWidth, setFeedTabWidth] = useState(0);
@@ -167,14 +167,7 @@ export default function Feed() {
   const [seenCounts, setSeenCounts] = useState<Map<string, number>>(new Map());
   const [contactIds, setContactIds] = useState<Set<string>>(new Set());
 
-  const [dropdownContentHeight, setDropdownContentHeight] = useState(350);
-  const dropdownHeight = useSharedValue(0);
-  const dropdownStyle = useAnimatedStyle(() => ({
-    height: dropdownHeight.value,
-    overflow: 'hidden',
-  }));
-
-   useEffect(() => {
+  useEffect(() => {
     channelRef.current = supabase
       .channel('quests-feed')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'quests' }, (payload) => {
@@ -193,9 +186,8 @@ export default function Feed() {
   }, []);
 
   const toggleFilter = () => {
-    const next = !filterOpen;
-    setFilterOpen(next);
-    dropdownHeight.value = withTiming(next ? dropdownContentHeight : 0, { duration: 250 });
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setFilterOpen((v) => !v);
   };
 
   const resetFilters = () => {
@@ -536,42 +528,39 @@ export default function Feed() {
             </Pressable>
           </View>
 
-          <Animated.View style={[broadcastDropdownStyle, { paddingHorizontal: 0, marginBottom: broadcastFilterOpen ? 10 : 0 }]}>
-            <View
-              onLayout={(e) => {
-                const h = e.nativeEvent.layout.height;
-                if (h > 0) setBroadcastDropdownContentHeight(h);
-              }}
-              style={{
-              backgroundColor: 'rgba(255,255,255,0.04)',
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.08)',
-              borderRadius: 16,
-              padding: 16,
-              gap: 14,
-            }}>
-              <View>
-                <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 10, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8 }}>
-                  CAN HELP WITH
-                </Text>
-                <FlatList
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  data={(['all', ...QUEST_TAGS] as (QuestTag | 'all')[])}
-                  keyExtractor={(item) => item}
-                  contentContainerStyle={{ gap: 6 }}
-                  renderItem={({ item }) => (
-                    <Chip
-                      label={item === 'all' ? 'Any' : item.charAt(0).toUpperCase() + item.slice(1)}
-                      selected={broadcastTagFilter === item}
-                      color={item !== 'all' ? TAG_COLOURS[item] : undefined}
-                      onPress={() => setBroadcastTagFilter(item as typeof broadcastTagFilter)}
-                    />
-                  )}
-                />
+          {broadcastFilterOpen && (
+            <View style={{ marginBottom: 10 }}>
+              <View style={{
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.08)',
+                borderRadius: 16,
+                padding: 16,
+                gap: 14,
+              }}>
+                <View>
+                  <Text style={{ color: 'rgba(255,255,255,0.30)', fontSize: 10, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8 }}>
+                    CAN HELP WITH
+                  </Text>
+                  <FlatList
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    data={(['all', ...QUEST_TAGS] as (QuestTag | 'all')[])}
+                    keyExtractor={(item) => item}
+                    contentContainerStyle={{ gap: 6 }}
+                    renderItem={({ item }) => (
+                      <Chip
+                        label={item === 'all' ? 'Any' : item.charAt(0).toUpperCase() + item.slice(1)}
+                        selected={broadcastTagFilter === item}
+                        color={item !== 'all' ? TAG_COLOURS[item] : undefined}
+                        onPress={() => setBroadcastTagFilter(item as typeof broadcastTagFilter)}
+                      />
+                    )}
+                  />
+                </View>
               </View>
             </View>
-          </Animated.View>
+          )}
         </View>
       )}
     </View>
@@ -687,14 +676,10 @@ export default function Feed() {
               </Pressable>
             </View>
 
-            {/* Animated filter dropdown */}
-            <Animated.View style={[dropdownStyle, { paddingHorizontal: 4, marginBottom: filterOpen ? 10 : 0 }]}>
-              <View
-                onLayout={(e) => {
-                  const h = e.nativeEvent.layout.height;
-                  if (h > 0) setDropdownContentHeight(h);
-                }}
-                style={{
+            {/* Filter dropdown */}
+            {filterOpen && (
+              <View style={{ paddingHorizontal: 4, marginBottom: 10 }}>
+              <View style={{
                 backgroundColor: 'rgba(255,255,255,0.04)',
                 borderWidth: 1,
                 borderColor: 'rgba(255,255,255,0.08)',
@@ -786,7 +771,8 @@ export default function Feed() {
                   </Pressable>
                 )}
               </View>
-            </Animated.View>
+              </View>
+            )}
           </View>
         }
         ListEmptyComponent={

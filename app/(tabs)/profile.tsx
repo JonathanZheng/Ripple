@@ -271,7 +271,7 @@ export default function ProfileScreen() {
               onPress={() => router.push('/contacts-graph')}
               style={{ backgroundColor: 'rgba(124,58,237,0.12)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.25)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 }}
             >
-              <Text style={{ color: '#a78bfa', fontSize: 13, fontWeight: '600' }}>View Graph</Text>
+              <Text style={{ color: '#a78bfa', fontSize: 13, fontWeight: '600' }}>View Contacts</Text>
             </Pressable>
           </Card>
         </View>
