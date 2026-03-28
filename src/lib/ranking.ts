@@ -27,6 +27,7 @@ export interface RankingContext {
   history: AcceptedQuestSummary[];   // last 50
   sessionBoosts: SessionTagBoosts;
   skippedQuestIds: Set<string>;       // seen 3+ times without tap
+  userLocation?: [number, number] | null; // [lat, lon] — optional, used for proximity bonus
   now?: Date;
 }
 
@@ -431,6 +432,19 @@ export function scoreQuest(
   // Tag momentum: +0.08 burst if last 3 accepted quests all share this tag
   if (precomputed.momentumTag === quest.tag) {
     bonus += 0.08;
+  }
+
+  // Proximity bonus: up to +0.10 for quests near the user (decay over ~500 m)
+  // Only applied when userLocation is available and quest has coordinates
+  if (
+    context.userLocation &&
+    quest.latitude != null &&
+    quest.longitude != null
+  ) {
+    const dLat = quest.latitude - context.userLocation[0];
+    const dLon = quest.longitude - context.userLocation[1];
+    const distKm = Math.sqrt(dLat * dLat + dLon * dLon) * 111;
+    bonus += 0.10 * Math.exp(-distKm / 0.5); // ~0.08 at 200 m, ~0.05 at 500 m
   }
 
   const sessionBoost = context.sessionBoosts[quest.tag] ?? 0;

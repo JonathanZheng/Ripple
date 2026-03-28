@@ -17,10 +17,18 @@ import { useSession } from '@/hooks/useSession';
 import { useRouteOffer } from '@/hooks/useRouteOffer';
 import { supabase } from '@/lib/supabase';
 import {
+  rankFeed,
+  initialSessionBoosts,
+  type RankingContext,
+  type AcceptedQuestSummary,
+} from '@/lib/ranking';
+import type { Quest } from '@/types/database';
+import {
   QUEST_TAGS,
   TAG_COLOURS,
   NUS_LOCATIONS,
   NUS_LOCATION_CATEGORY_LABELS,
+  ROUTE_OFFER_RADIUS_DEG,
   type NusLocationCategory,
 } from '@/constants';
 import * as Location from 'expo-location';
@@ -44,6 +52,39 @@ function geohashEncode(lat: number, lng: number): string {
     if (bitCount === 5) { hash += BASE32[bits]; bits = 0; bitCount = 0; }
   }
   return hash;
+}
+
+/** Proximity score [0–1]: 1.0 at destination, ~0.5 at 300 m, ~0.1 at 700 m */
+function proximityScore(questLat: number | null, questLon: number | null, destLat: number, destLon: number): number {
+  if (questLat == null || questLon == null) return 0;
+  const dLat = questLat - destLat;
+  const dLon = questLon - destLon;
+  const distKm = Math.sqrt(dLat * dLat + dLon * dLon) * 111;
+  return Math.exp(-distKm / 0.3);
+}
+
+async function notifyNearbyQuests(lat: number, lon: number, locationName: string) {
+  const SEARCH_RADIUS = ROUTE_OFFER_RADIUS_DEG * 3; // ~1 km — wider than the feed badge radius
+  const { data } = await supabase
+    .from('quests')
+    .select('id, title')
+    .eq('status', 'open')
+    .gte('latitude', lat - SEARCH_RADIUS)
+    .lte('latitude', lat + SEARCH_RADIUS)
+    .gte('longitude', lon - SEARCH_RADIUS)
+    .lte('longitude', lon + SEARCH_RADIUS);
+
+  const count = data?.length ?? 0;
+  if (count === 0) return;
+
+  Alert.alert(
+    `${count} Quest${count > 1 ? 's' : ''} Near ${locationName}!`,
+    `There ${count > 1 ? 'are' : 'is'} ${count} open quest${count > 1 ? 's' : ''} near your broadcast location. Head to the feed to see them.`,
+    [
+      { text: 'Later', style: 'cancel' },
+      { text: 'View Feed', onPress: () => router.push('/(tabs)/feed') },
+    ],
+  );
 }
 
 const formatDistance = (meters: number) => {
@@ -200,6 +241,7 @@ export default function RouteOfferConfirmScreen() {
         if (!error) {
           setTimeLeft(locationDuration * 60);
           setStatus('waiting');
+          notifyNearbyQuests(lat, lon, locationName.trim());
         }
       } else {
         const mins = useCustomTime ? customHours * 60 + customMins : (selectedMinutes || 0);
@@ -220,6 +262,7 @@ export default function RouteOfferConfirmScreen() {
         });
         insertError = error;
         if (!error) {
+          notifyNearbyQuests(selectedLat, selectedLon, locationName.trim());
           if (mins === 0) handleShowManifest();
           else { setTimeLeft(mins * 60); setStatus('waiting'); }
         }
@@ -239,13 +282,113 @@ export default function RouteOfferConfirmScreen() {
 
   async function handleShowManifest(lat?: number, lon?: number, mode?: string) {
     setStatus('loading');
-    const loc = await Location.getCurrentPositionAsync({});
-    const { data } = await supabase.rpc('get_ai_ranked_route_quests', {
-      user_origin_lon: loc.coords.longitude, user_origin_lat: loc.coords.latitude,
-      user_dest_lon: lon || selectedLon, user_dest_lat: lat || selectedLat,
-      user_pref_vector: null, transport_mode: mode || transportType
-    });
-    setMatches(data || []);
+    const destLat = lat ?? selectedLat;
+    const destLon = lon ?? selectedLon;
+    const RADIUS = ROUTE_OFFER_RADIUS_DEG * 4; // ~1.3 km
+
+    // 1. Fetch nearby quests — try PostGIS RPC first, fall back to bbox
+    let nearbyQuests: Quest[] = [];
+
+    try {
+      const { status: permStatus } = await Location.getForegroundPermissionsAsync();
+      if (permStatus !== 'granted') throw new Error('no permission');
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_ai_ranked_route_quests', {
+        user_origin_lon: loc.coords.longitude,
+        user_origin_lat: loc.coords.latitude,
+        user_dest_lon: destLon,
+        user_dest_lat: destLat,
+        user_pref_vector: null,
+        transport_mode: mode || transportType,
+      });
+      if (!rpcError && rpcData && rpcData.length > 0) {
+        const ids = (rpcData as { id: string }[]).map((r) => r.id);
+        const { data: full } = await supabase
+          .from('quests').select('*').in('id', ids);
+        nearbyQuests = (full as Quest[]) ?? [];
+      }
+    } catch { /* GPS unavailable — fall through */ }
+
+    if (nearbyQuests.length === 0) {
+      const { data: bbox } = await supabase
+        .from('quests').select('*').eq('status', 'open')
+        .gte('latitude', destLat - RADIUS).lte('latitude', destLat + RADIUS)
+        .gte('longitude', destLon - RADIUS).lte('longitude', destLon + RADIUS);
+      nearbyQuests = (bbox as Quest[]) ?? [];
+    }
+
+    if (nearbyQuests.length === 0) {
+      setMatches([]);
+      setStatus('manifest');
+      return;
+    }
+
+    // 2. Fetch user history + profile for ranking
+    let history: AcceptedQuestSummary[] = [];
+    let userRc = '';
+    let skills: string[] = [];
+
+    if (userId) {
+      const [{ data: histData }, { data: profile }] = await Promise.all([
+        supabase
+          .from('quests')
+          .select('tag, created_at, location_name, fulfilment_mode, reward_amount')
+          .eq('acceptor_id', userId)
+          .in('status', ['completed', 'in_progress'])
+          .order('created_at', { ascending: false })
+          .limit(50),
+        supabase
+          .from('profiles')
+          .select('rc, skills')
+          .eq('id', userId)
+          .maybeSingle(),
+      ]);
+      history = (histData as AcceptedQuestSummary[]) ?? [];
+      userRc = profile?.rc ?? '';
+      skills = profile?.skills ?? [];
+    }
+
+    // 3. Rank: blend feed algorithm (personal fit) + proximity to destination
+    const context: RankingContext = {
+      userRc,
+      tier: 'wanderer', // eligibility gating not applied in manifest
+      skills,
+      history,
+      sessionBoosts: initialSessionBoosts(),
+      skippedQuestIds: new Set(),
+    };
+    const { pinned, ranked } = rankFeed(nearbyQuests, context);
+
+    // Normalise feed scores to [0, 1] so they're comparable to proximity
+    const maxFeedScore = ranked.length > 0 ? Math.max(...ranked.map((s) => s.score)) : 1;
+    const normFeed = (score: number) => maxFeedScore > 0 ? score / maxFeedScore : 0;
+
+    // 60% proximity to destination, 40% personal fit
+    const blended = ranked
+      .map((s) => ({
+        quest: s.quest,
+        blendedScore:
+          0.6 * proximityScore(s.quest.latitude, s.quest.longitude, destLat, destLon) +
+          0.4 * normFeed(s.score),
+      }))
+      .sort((a, b) => b.blendedScore - a.blendedScore)
+      .map((s) => s.quest);
+
+    const orderedQuests = [...pinned, ...blended];
+
+    setMatches(
+      orderedQuests.map((q) => ({
+        ...q,
+        ai_match_score: 1.0,
+        is_at_destination:
+          proximityScore(q.latitude, q.longitude, destLat, destLon) > 0.7, // within ~150 m
+        distance_meters:
+          Math.sqrt(
+            Math.pow((q.latitude ?? destLat) - destLat, 2) +
+            Math.pow((q.longitude ?? destLon) - destLon, 2)
+          ) * 111_000, // degrees → metres (approx)
+      }))
+    );
     setStatus('manifest');
   }
 

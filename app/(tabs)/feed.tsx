@@ -358,8 +358,9 @@ export default function Feed() {
       history: acceptHistory,
       sessionBoosts,
       skippedQuestIds,
+      userLocation,
     };
-  }, [profile, acceptHistory, sessionBoosts, skippedQuestIds]);
+  }, [profile, acceptHistory, sessionBoosts, skippedQuestIds, userLocation]);
 
   // Apply ranking after filters
   const { pinned, ranked } = useMemo(() => {
